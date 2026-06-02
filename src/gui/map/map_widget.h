@@ -59,6 +59,7 @@ class QWheelEvent;
 
 namespace OpenOrienteering {
 
+class CourseOverlay;
 class GPSDisplay;
 class GPSTemporaryMarkers;
 class MapEditorActivity;
@@ -314,6 +315,9 @@ public:
 	 *  (mouse press or drag) with the widget. */
 	int getTimeSinceLastInteraction();
 	
+	/** Sets the course overlay to use. Called by CourseOverlay constructor/destructor. */
+	void setCourseOverlay(CourseOverlay* overlay);
+
 	/** Sets the GPS display to use. This is called internally by the GPSDisplay constructor. */
 	void setGPSDisplay(GPSDisplay* gps_display);
 	/** Sets the GPS temporary markers display to use. This is called internally by the GPSTemporaryMarkers constructor. */
@@ -544,6 +548,8 @@ private:
 	QTime last_mouse_release_time;
 	int current_pressed_buttons;
 	
+	/** Optional course overlay */
+	CourseOverlay* course_overlay;
 	/** Optional GPS display */
 	GPSDisplay* gps_display;
 	/** Optional temporary GPS marker display. */

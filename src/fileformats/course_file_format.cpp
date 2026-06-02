@@ -26,6 +26,7 @@
 
 #include "fileformats/file_import_export.h"
 #include "fileformats/iof_course_export.h"
+#include "fileformats/iof_course_export_full.h"
 #include "fileformats/kml_course_export.h"
 
 
@@ -51,6 +52,7 @@ std::vector<std::unique_ptr<CourseFileFormat>> CourseFileFormat::makeAll()
 	
 	result.push_back(makeFileFormat<IofCourseExport>(SimpleCourseFile, "simple-iof-course"));
 	result.push_back(makeFileFormat<KmlCourseExport>(SimpleCourseFile, "simple-kml-course"));
+	result.push_back(makeFileFormat<IofCourseExportFull>(SimpleCourseFile, "full-iof-course"));
 	return result;
 }
 

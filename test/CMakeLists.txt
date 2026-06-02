@@ -189,6 +189,9 @@ add_unit_test(util_t ../src/util/util
 # Benchmarks
 add_system_test(coord_xml_t MANUAL)
 
+# Course planning system test
+add_system_test(course_t)
+
 # System tests
 add_system_test(file_format_t)
 add_system_test(duplicate_equals_t)

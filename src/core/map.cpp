@@ -43,6 +43,7 @@
 #include <QTimer>
 #include <QTranslator>
 
+#include "course/course_database.h"
 #include "core/georeferencing.h"
 #include "core/map_color.h"
 #include "core/map_coord.h"
@@ -448,7 +449,9 @@ Map::~Map()
 void Map::clear()
 {
 	undo_manager->clear();
-	
+
+	course_database.reset();
+
 	templates.clear();
 	first_front_template = 0;
 	closed_templates.clear();
@@ -474,7 +477,9 @@ void Map::clear()
 void Map::init()
 {
 	color_set = new MapColorSet();
-	
+
+	course_database = std::make_unique<CourseDatabase>(this);
+
 	parts.push_back(new MapPart(tr("default part"), this));
 	
 	widgets.clear();
@@ -607,6 +612,17 @@ void Map::rotateMap(double rotation, const MapCoord& center, bool adjust_georefe
 void Map::setMapNotes(const QString& text)
 {
 	map_notes = text;
+}
+
+
+CourseDatabase& Map::courseDatabase()
+{
+	return *course_database;
+}
+
+const CourseDatabase& Map::courseDatabase() const
+{
+	return *course_database;
 }
 
 

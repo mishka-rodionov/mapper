@@ -49,6 +49,8 @@
 #include "settings.h"
 #include "core/georeferencing.h"
 #include "core/map.h"
+#include "course/course_database.h"
+#include "course/course_serialization.h"
 #include "core/map_color.h"
 #include "core/map_coord.h"
 #include "core/map_grid.h"
@@ -209,6 +211,7 @@ namespace literal
 	
 	static const QLatin1String undo("undo");
 	static const QLatin1String redo("redo");
+	static const QLatin1String courses("courses");
 }
 
 
@@ -284,6 +287,9 @@ bool XMLFileExporter::exportImplementation()
 		writeLineBreak(xml);
 		exportPrint();
 		delete barrier;
+		writeLineBreak(xml);
+
+		exportCourses();
 		writeLineBreak(xml);
 
 		if (Settings::getInstance().getSetting(Settings::General_SaveUndoRedo).toBool()
@@ -501,6 +507,16 @@ void XMLFileExporter::exportPrint()
 	}
 }
 
+void XMLFileExporter::exportCourses()
+{
+	const auto& db = map->courseDatabase();
+	if (db.numControls() > 0 || db.numCourses() > 0 || !db.eventName().isEmpty())
+	{
+		CourseSerialization::save(xml, db);
+		writeLineBreak(xml);
+	}
+}
+
 void XMLFileExporter::exportUndo()
 {
 	map->undoManager().saveUndo(xml);
@@ -632,6 +648,8 @@ void XMLFileImporter::importElements()
 			importTemplates();
 		else if (name == literal::print)
 			importPrint();
+		else if (name == literal::courses)
+			importCourses();
 		else if (name == literal::undo)
 			importUndo();
 		else if (name == literal::redo)
@@ -1074,6 +1092,12 @@ void XMLFileImporter::importPrint()
 		addWarning(::OpenOrienteering::ImportExport::tr("Error while loading the printing configuration at %1:%2: %3")
 		           .arg(xml.lineNumber()).arg(xml.columnNumber()).arg(e.message()));
 	}
+}
+
+void XMLFileImporter::importCourses()
+{
+	FILEFORMAT_ASSERT(xml.name() == literal::courses);
+	CourseSerialization::load(xml, map->courseDatabase());
 }
 
 void XMLFileImporter::importUndo()

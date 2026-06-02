@@ -56,6 +56,7 @@ class QWidget;
 namespace OpenOrienteering {
 
 class CombinedSymbol;
+class CourseDatabase;
 class Georeferencing;
 class LineSymbol;
 class MapColor;
@@ -1246,9 +1247,14 @@ public:
 		bool adjust_templates);
 	
 	
+	/** Returns the course database owned by this map. Always valid. */
+	CourseDatabase& courseDatabase();
+	const CourseDatabase& courseDatabase() const;
+
+
 	/** Returns the map notes string. */
 	const QString& getMapNotes() const;
-	
+
 	/**
 	 * Sets the map notes string.
 	 * NOTE: Set the map to dirty manually!
@@ -1624,7 +1630,9 @@ private:
 	QScopedPointer<MapRenderables> selection_renderables;
 	
 	QString map_notes;
-	
+
+	std::unique_ptr<CourseDatabase> course_database;
+
 	QScopedPointer<Georeferencing> georeferencing;
 	
 	MapGrid grid;

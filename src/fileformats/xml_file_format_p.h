@@ -57,6 +57,7 @@ protected:
 	void exportTemplates();
 	void exportView();
 	void exportPrint();
+	void exportCourses();
 	void exportUndo();
 	void exportRedo();
 	
@@ -97,6 +98,7 @@ protected:
 	void importTemplates();
 	void importView();
 	void importPrint();
+	void importCourses();
 	void importUndo();
 	void importRedo();
 	

@@ -77,6 +77,15 @@ UndoStep* UndoStep::getUndoStepForType(Type type, Map* map)
 	case MapPartUndoStepType:
 		return new MapPartUndoStep(map);
 		
+	// Course planning steps: treated as valid no-ops when loading from file.
+	// Course undo history is not persisted across file open/close (v1 scope).
+	case CourseControlAddedType:
+	case CourseControlMovedType:
+	case CourseControlRemovedType:
+	case CourseControlDescEditType:
+	case CoursesChangedType:
+		return new NoOpUndoStep(map, true);
+
 	default:
 		qWarning("Undefined undo step type");
 		Q_FALLTHROUGH();

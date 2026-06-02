@@ -120,6 +120,7 @@
 #include "gui/util_gui.h"
 #include "gui/map/map_dialog_scale.h"
 #include "gui/map/map_editor_activity.h"
+#include "gui/course/course_feature.h"
 #include "gui/map/map_find_feature.h"
 #include "gui/map/map_information_dialog.h"
 #include "gui/map/map_notes.h"
@@ -483,7 +484,11 @@ void MapEditorController::setEditingInProgress(bool value)
 		
 		// Templates menu
 		paint_feature->setEnabled(!editing_in_progress);
-		
+
+		// Course planning
+		if (course_feature)
+			course_feature->setEnabled(!editing_in_progress);
+
 		updateObjectDependentActions();
 		updateSymbolDependentActions();
 		updateSymbolAndObjectDependentActions();
@@ -1088,7 +1093,9 @@ void MapEditorController::createActions()
 	distribute_points_act = newAction("distributepoints", tr("Distribute points along path"), this, SLOT(distributePointsClicked()), "tool-distribute-points.png", QString{}, "toolbars.html#distribute_points"); // TODO: write documentation
 	
 	paint_feature = std::make_unique<PaintOnTemplateFeature>(*this);
-	
+
+	course_feature = std::make_unique<CourseFeature>(*this);
+
 	touch_cursor_action = newCheckAction("touchcursor", tr("Enable touch cursor"), map_widget, SLOT(enableTouchCursor(bool)), "tool-touch-cursor.png", QString{}, "toolbars.html#touch_cursor"); // TODO: write documentation
 	gps_display_action = newCheckAction("gpsdisplay", tr("Enable GPS display"), this, SLOT(enableGPSDisplay(bool)), "tool-gps-display.png", QString{}, "toolbars.html#gps_display"); // TODO: write documentation
 	gps_display_action->setEnabled(map->getGeoreferencing().getState() == Georeferencing::Geospatial);
@@ -1274,7 +1281,19 @@ void MapEditorController::createMenuAndToolbars()
 	map_menu->addMenu(mappart_move_menu);
 	map_menu->addMenu(mappart_merge_menu);
 	map_menu->addAction(mappart_merge_act);
-	
+
+	// Courses submenu
+	if (course_feature)
+	{
+		map_menu->addSeparator();
+		QMenu* courses_menu = map_menu->addMenu(tr("&Courses"));
+		courses_menu->menuAction()->setMenuRole(QAction::NoRole);
+		courses_menu->addAction(course_feature->showPanelAction());
+		courses_menu->addAction(course_feature->placeControlAction());
+		courses_menu->addSeparator();
+		courses_menu->addAction(course_feature->exportIofFullAction());
+	}
+
 	// Symbols menu
 	QMenu* symbols_menu = window->menuBar()->addMenu(tr("Sy&mbols"));
 	symbols_menu->setWhatsThis(Util::makeWhatThis("symbols_menu.html"));
@@ -1680,7 +1699,8 @@ void MapEditorController::detach()
 	
 	find_feature.reset(nullptr);
 	paint_feature.reset(nullptr);
-	
+	course_feature.reset(nullptr);
+
 	window->setCentralWidget(nullptr);
 	delete map_widget;
 	

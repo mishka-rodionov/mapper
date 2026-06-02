@@ -64,6 +64,7 @@
 #include "gui/widgets/action_grid_bar.h"
 #include "gui/widgets/key_button_bar.h"
 #include "gui/widgets/pie_menu.h"
+#include "course/course_overlay.h"
 #include "sensors/gps_display.h"
 #include "sensors/gps_temporary_markers.h"
 #include "templates/template.h"
@@ -101,6 +102,7 @@ MapWidget::MapWidget(bool show_help, bool force_antialiasing, QWidget* parent)
  , activity_dirty_rect_border(0)
  , last_mouse_release_time(QTime::currentTime())
  , current_pressed_buttons(0)
+ , course_overlay(nullptr)
  , gps_display(nullptr)
  , marker_display(nullptr)
 {
@@ -733,6 +735,11 @@ int MapWidget::getTimeSinceLastInteraction()
 		return last_mouse_release_time.msecsTo(QTime::currentTime());
 }
 
+void MapWidget::setCourseOverlay(CourseOverlay* overlay)
+{
+	course_overlay = overlay;
+}
+
 void MapWidget::setGPSDisplay(GPSDisplay* gps_display)
 {
 	this->gps_display = gps_display;
@@ -937,10 +944,14 @@ void MapWidget::paintEvent(QPaintEvent* event)
 		tool->draw(&painter, this);
 	
 	
+	// Draw course overlay
+	if (course_overlay)
+		course_overlay->paint(&painter);
+
 	// Draw temporary GPS marker display
 	if (marker_display)
 		marker_display->paint(&painter);
-	
+
 	// Draw GPS display
 	if (gps_display)
 		gps_display->paint(&painter);

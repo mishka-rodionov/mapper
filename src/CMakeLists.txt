@@ -89,6 +89,13 @@ set(Mapper_Common_SRCS
   mapper_resource.cpp
   settings.cpp
   
+  course/course.cpp
+  course/course_control.cpp
+  course/course_database.cpp
+  course/course_overlay.cpp
+  course/course_serialization.cpp
+  course/course_undo.cpp
+
   core/app_permissions.cpp
   core/autosave.cpp
   core/crs_template.cpp
@@ -133,6 +140,7 @@ set(Mapper_Common_SRCS
   fileformats/file_format_registry.cpp
   fileformats/file_import_export.cpp
   fileformats/iof_course_export.cpp
+  fileformats/iof_course_export_full.cpp
   fileformats/kml_course_export.cpp
   fileformats/ocd_file_export.cpp
   fileformats/ocd_file_format.cpp
@@ -169,6 +177,10 @@ set(Mapper_Common_SRCS
   gui/map/map_dialog_scale.cpp
   gui/map/map_editor.cpp
   gui/map/map_editor_activity.cpp
+  gui/course/control_properties_widget.cpp
+  gui/course/course_feature.cpp
+  gui/course/course_panel.cpp
+
   gui/map/map_find_feature.cpp
   gui/map/map_information_dialog.cpp
   gui/map/map_notes.cpp
@@ -252,6 +264,7 @@ set(Mapper_Common_SRCS
   tools/fill_tool.cpp
   tools/object_selector.cpp
   tools/pan_tool.cpp
+  tools/place_control_tool.cpp
   tools/point_handles.cpp
   tools/rotate_tool.cpp
   tools/rotate_pattern_tool.cpp

@@ -4899,8 +4899,37 @@ do not assume any liability!</text></object>
 </templates>
 <view>
 <grid color="#646464" display="0" alignment="0" additional_rotation="0" unit="1" h_spacing="5" v_spacing="5" h_offset="0" v_offset="0"/>
-<map_view zoom="0.707107" position_x="-2902" position_y="-1183"><map opacity="1" visible="true"/><templates hidden="true" count="0"/></map_view>
+<map_view zoom="3.30099" position_x="2739" position_y="61446"><map opacity="1" visible="true"/><templates hidden="true" count="0"/></map_view>
 </view>
 <print scale="4000" resolution="300" simulate_overprinting="true" mode="raster"><page_format paper_size="A4" orientation="portrait" h_overlap="5" v_overlap="5"><dimensions width="210" height="297"/><page_rect left="4.23" top="3.53" width="201.54" height="289.94"/></page_format><print_area left="-103.672" top="-146.153" width="201.54" height="289.94" center_area="true" single_page="true"/></print>
+</barrier>
+<courses version="1"><control id="101" type="regular" x="-32171" y="-23269"><description feature_part="Northern" feature="Boulder" approach="Open" location="N foot"/></control><control id="102" type="regular" x="29323" y="-45106"><description feature_part="NE" feature="Spur" approach="Overgrown" location="SE foot"/></control><control id="103" type="regular" x="3470" y="-5950"/><control id="104" type="regular" x="-25520" y="16137"/><control id="105" type="regular" x="19910" y="32954"/><course name="Short" type="linear"/><course name="Long" type="linear"><entry control="101"/><entry control="102"/><entry control="103"/><entry control="104"/><entry control="105"/></course></courses>
+
+<barrier version="6" required="0.6.0">
+<undo>
+<step type="100"/>
+<step type="100"/>
+<step type="100"/>
+<step type="101"/>
+<step type="100"/>
+<step type="100"/>
+<step type="103"/>
+<step type="103"/>
+<step type="103"/>
+<step type="103"/>
+<step type="104"/>
+<step type="104"/>
+<step type="104"/>
+<step type="103"/>
+<step type="103"/>
+<step type="103"/>
+<step type="103"/>
+<step type="104"/>
+<step type="104"/>
+<step type="104"/>
+<step type="104"/>
+</undo>
+<redo>
+</redo>
 </barrier>
 </map>

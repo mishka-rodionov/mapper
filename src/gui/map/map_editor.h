@@ -64,6 +64,7 @@ class MainWindow;
 class MapCoordF;
 class MapEditorActivity;
 class MapEditorTool;
+class CourseFeature;
 class MapFindFeature;
 class MapView;
 class MapWidget;
@@ -812,6 +813,8 @@ private:
 	QAction* distribute_points_act = {};
 	
 	std::unique_ptr<PaintOnTemplateFeature> paint_feature;
+
+	std::unique_ptr<CourseFeature> course_feature;
 	
 	QAction* touch_cursor_action = {};
 	QAction* gps_display_action = {};
