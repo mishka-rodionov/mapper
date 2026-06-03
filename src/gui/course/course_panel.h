@@ -29,8 +29,10 @@
 #include "course/course_control.h"
 
 class QButtonGroup;
+class QLabel;
 class QListWidget;
 class QPushButton;
+class QSpinBox;
 class QTabWidget;
 class QToolButton;
 class QTreeWidget;
@@ -92,6 +94,7 @@ private slots:
 
     // Entries tab actions
     void addSelectedControlToCourse();
+    void onClimbValueChanged(int value);
     void removeEntryFromCourse();
     void moveEntryUp();
     void moveEntryDown();
@@ -133,6 +136,9 @@ private:
     QPushButton*  remove_entry_btn = nullptr;
     QPushButton*  entry_up_btn    = nullptr;
     QPushButton*  entry_down_btn  = nullptr;
+
+    QLabel*       climb_label     = nullptr;
+    QSpinBox*     climb_spinbox   = nullptr;
 
     QString selected_control_id;  ///< Currently highlighted control
     bool rebuilding = false;       ///< Guard against recursive rebuild

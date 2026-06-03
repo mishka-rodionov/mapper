@@ -30,6 +30,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QTabWidget>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -189,6 +190,22 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         entry_btns->addWidget(entry_up_btn);
         entry_btns->addWidget(entry_down_btn);
 
+        // Climb (manual entry)
+        climb_label   = new QLabel(tr("Climb:"));
+        climb_spinbox = new QSpinBox;
+        climb_spinbox->setRange(0, 9999);
+        climb_spinbox->setSuffix(tr(" m"));
+        climb_spinbox->setToolTip(tr("Total climb along the course in meters (enter manually)"));
+        climb_spinbox->setEnabled(false);
+        climb_label->setEnabled(false);
+
+        connect(climb_spinbox, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &CoursePanelWidget::onClimbValueChanged);
+
+        auto* climb_row = new QHBoxLayout;
+        climb_row->addWidget(climb_label);
+        climb_row->addWidget(climb_spinbox, 1);
+
         auto* layout = new QVBoxLayout;
         layout->addWidget(new QLabel(tr("Courses:")));
         layout->addWidget(courses_list, 2);
@@ -196,6 +213,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         layout->addWidget(new QLabel(tr("Entries:")));
         layout->addWidget(entries_list, 3);
         layout->addLayout(entry_btns);
+        layout->addLayout(climb_row);
         layout->setContentsMargins(4, 4, 4, 4);
         auto* tab = new QWidget;
         tab->setLayout(layout);
@@ -369,11 +387,31 @@ void CoursePanelWidget::rebuildEntriesList()
 void CoursePanelWidget::onCourseSelectionChanged()
 {
     rebuildEntriesList();
+
+    const int idx = selectedCourseIndex();
+
+    // Update climb spinbox
+    rebuilding = true;
+    climb_spinbox->setEnabled(idx >= 0);
+    climb_label->setEnabled(idx >= 0);
+    if (idx >= 0)
+        climb_spinbox->setValue(db.course(idx).climb_m);
+    rebuilding = false;
+
     if (overlay)
-    {
-        const int idx = selectedCourseIndex();
         overlay->setVisibleCourse(idx >= 0 ? &db.course(idx) : nullptr);
-    }
+}
+
+void CoursePanelWidget::onClimbValueChanged(int value)
+{
+    const int idx = selectedCourseIndex();
+    if (idx < 0 || rebuilding)
+        return;
+    auto snapshot   = coursesSnapshot();
+    auto updated    = db.course(idx);
+    updated.climb_m = value;
+    db.updateCourse(idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
 }
 
 void CoursePanelWidget::addCourse()

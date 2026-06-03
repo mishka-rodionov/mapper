@@ -112,6 +112,15 @@ private:
     void paintISCDCell(QPainter* painter, const QString& text,
                        const QRectF& cell, int column) const;
 
+    /** Draws a miniature start triangle filling the given cell. */
+    void paintStartCell(QPainter* painter, const QRectF& cell) const;
+
+    /** Draws miniature finish concentric circles filling the given cell. */
+    void paintFinishCell(QPainter* painter, const QRectF& cell) const;
+
+    /** Returns the total course distance in meters (0 if < 2 resolved controls). */
+    qreal computeCourseDistanceM(const Course& course) const;
+
     // ISCD column-specific symbol renderers
     void drawISCDFeatureSymbol(QPainter* painter, const QString& feature, const QRectF& r) const;
     void drawISCDPartSymbol(QPainter* painter, const QString& part, const QRectF& r) const;

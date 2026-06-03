@@ -57,6 +57,7 @@ struct Course
     QString name;
     CourseType type = CourseType::Linear;
     std::vector<CourseEntry> entries;  ///< Ordered [Start, controls..., Finish]
+    int climb_m = 0;                   ///< Climb in meters (entered manually)
 
     bool operator==(const Course& other) const noexcept;
     bool operator!=(const Course& other) const noexcept { return !(*this == other); }

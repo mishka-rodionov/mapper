@@ -49,6 +49,7 @@ static const QLatin1String attr_x            ("x");
 static const QLatin1String attr_y            ("y");
 static const QLatin1String attr_name         ("name");
 static const QLatin1String attr_control      ("control");
+static const QLatin1String attr_climb        ("climb");
 
 // ControlDescription attributes
 static const QLatin1String attr_code         ("code");
@@ -126,6 +127,8 @@ void saveCourse(QXmlStreamWriter& xml, const Course& c)
     XmlElementWriter elem(xml, tag_course);
     elem.writeAttribute(attr_name, c.name);
     elem.writeAttribute(attr_type, courseTypeToString(c.type));
+    if (c.climb_m > 0)
+        elem.writeAttribute(attr_climb, c.climb_m);
     for (const auto& entry : c.entries)
     {
         XmlElementWriter entry_elem(xml, tag_entry);
@@ -173,8 +176,9 @@ Course loadCourse(QXmlStreamReader& xml)
 {
     Course c;
     const auto attrs = xml.attributes();
-    c.name = attrs.value(attr_name).toString();
-    c.type = courseTypeFromString(attrs.value(attr_type));
+    c.name    = attrs.value(attr_name).toString();
+    c.type    = courseTypeFromString(attrs.value(attr_type));
+    c.climb_m = attrs.value(attr_climb).toInt();
 
     while (xml.readNextStartElement())
     {

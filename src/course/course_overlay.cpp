@@ -39,6 +39,7 @@
 #include <QString>
 #include <QVector>
 
+#include "core/map.h"
 #include "course/course.h"
 #include "course/course_control.h"
 #include "course/course_database.h"
@@ -372,6 +373,79 @@ bool CourseOverlay::mouseReleaseEvent(QMouseEvent* event)
 // IOF description table
 // ============================================================
 
+qreal CourseOverlay::computeCourseDistanceM(const Course& course) const
+{
+    if (course.entries.size() < 2)
+        return 0.0;
+
+    QVector<const CourseControl*> resolved;
+    resolved.reserve(static_cast<int>(course.entries.size()));
+    for (const auto& entry : course.entries)
+    {
+        if (const auto* ctrl = db.findById(entry.control_id))
+            resolved.append(ctrl);
+    }
+
+    if (resolved.size() < 2)
+        return 0.0;
+
+    qreal total_mm = 0.0;
+    for (int i = 1; i < resolved.size(); ++i)
+    {
+        const MapCoordF p1(resolved[i-1]->position);
+        const MapCoordF p2(resolved[i  ]->position);
+        const qreal dx = p1.x() - p2.x();
+        const qreal dy = p1.y() - p2.y();
+        total_mm += std::sqrt(dx * dx + dy * dy);
+    }
+
+    const Map* map = widget->getMapView()->getMap();
+    const qreal scale = map ? static_cast<qreal>(map->getScaleDenominator()) : 10000.0;
+    return total_mm * scale / 1000.0;
+}
+
+
+void CourseOverlay::paintStartCell(QPainter* painter, const QRectF& cell) const
+{
+    const qreal cx  = cell.center().x();
+    const qreal cy  = cell.center().y();
+    const qreal r   = std::min(cell.width(), cell.height()) * 0.36;
+    const qreal lw  = std::max(1.0, r * 0.18);
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(QPen(course_purple, lw));
+    painter->setBrush(Qt::NoBrush);
+
+    QPolygonF tri;
+    for (int k = 0; k < 3; ++k)
+    {
+        const double angle = -M_PI / 2.0 + k * (2.0 * M_PI / 3.0);
+        tri << QPointF(cx + r * std::cos(angle), cy + r * std::sin(angle));
+    }
+    painter->drawPolygon(tri);
+    painter->restore();
+}
+
+
+void CourseOverlay::paintFinishCell(QPainter* painter, const QRectF& cell) const
+{
+    const qreal cx      = cell.center().x();
+    const qreal cy      = cell.center().y();
+    const qreal r_outer = std::min(cell.width(), cell.height()) * 0.38;
+    const qreal r_inner = r_outer * (finish_inner_mm / finish_outer_mm);
+    const qreal lw      = std::max(1.0, r_outer * 0.15);
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(QPen(course_purple, lw));
+    painter->setBrush(Qt::NoBrush);
+    painter->drawEllipse(QPointF(cx, cy), r_outer, r_outer);
+    painter->drawEllipse(QPointF(cx, cy), r_inner, r_inner);
+    painter->restore();
+}
+
+
 void CourseOverlay::paintDescriptionTable(QPainter* painter)
 {
     Q_ASSERT(visible_course);
@@ -387,43 +461,62 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
         QString other;
     };
 
+    // Collect regular-control rows and detect Start/Finish presence
     QVector<Row> rows;
+    const CourseControl* start_ctrl  = nullptr;
+    const CourseControl* finish_ctrl = nullptr;
     int seq = 1;
     for (const auto& entry : visible_course->entries)
     {
         const auto* ctrl = db.findById(entry.control_id);
-        if (!ctrl || ctrl->type != ControlType::Regular)
+        if (!ctrl)
             continue;
-        Row r;
-        r.seq      = seq++;
-        r.code     = ctrl->description.code.isEmpty() ? ctrl->id : ctrl->description.code;
-        r.part     = ctrl->description.feature_part;
-        r.feature  = ctrl->description.feature;
-        r.approach = ctrl->description.approach;
-        r.dims     = ctrl->description.dimensions;
-        r.location = ctrl->description.location_detail;
-        r.other    = ctrl->description.other_info;
-        rows.append(r);
+        if (ctrl->type == ControlType::Start)
+        {
+            start_ctrl = ctrl;
+        }
+        else if (ctrl->type == ControlType::Finish)
+        {
+            finish_ctrl = ctrl;
+        }
+        else if (ctrl->type == ControlType::Regular)
+        {
+            Row r;
+            r.seq      = seq++;
+            r.code     = ctrl->description.code.isEmpty() ? ctrl->id : ctrl->description.code;
+            r.part     = ctrl->description.feature_part;
+            r.feature  = ctrl->description.feature;
+            r.approach = ctrl->description.approach;
+            r.dims     = ctrl->description.dimensions;
+            r.location = ctrl->description.location_detail;
+            r.other    = ctrl->description.other_info;
+            rows.append(r);
+        }
     }
 
-    if (rows.isEmpty())
+    const bool has_start  = (start_ctrl  != nullptr);
+    const bool has_finish = (finish_ctrl != nullptr);
+
+    // Need at least something to display
+    if (rows.isEmpty() && !has_start && !has_finish)
         return;
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
 
-    // All cells are cell_mm × cell_mm per IOF ISCD standard
     const qreal cell_px = mmToViewportPx(cell_mm);
     const int cell = static_cast<int>(std::round(cell_px));
 
-    // 8 equal-width columns (A–H), header row of the same height
     constexpr int NCOLS = 8;
-    const int total_w = NCOLS * cell;
-    const int header_h = cell;
+    const int total_w  = NCOLS * cell;
+    const int header_h = 2 * cell;  // two-line header: name + info row
     const int row_h    = cell;
-    const int total_h  = header_h + row_h * rows.size();
+    const int total_h  = header_h
+                       + (has_start  ? row_h : 0)
+                       + row_h * rows.size()
+                       + (has_finish ? row_h : 0);
 
-    // Initialize anchor to bottom-left of widget on first display
+    // Initialize anchor (default: bottom-left of widget)
     if (!legend_anchor_initialized)
     {
         const int margin = static_cast<int>(mmToViewportPx(5.0));
@@ -432,12 +525,10 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
         legend_anchor_initialized = true;
     }
 
-    // Compute viewport top-left from map anchor
     const QPointF tl = widget->mapToViewport(legend_anchor);
     const int x0 = static_cast<int>(std::round(tl.x()));
     const int y0 = static_cast<int>(std::round(tl.y()));
 
-    // Cache bounds for hit-testing in mouse events
     legend_bounds_cache = QRectF(x0, y0, total_w, total_h);
 
     // Background
@@ -445,26 +536,81 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     painter->setBrush(QColor(255, 255, 255, 230));
     painter->drawRect(x0, y0, total_w, total_h);
 
-    // Header: course name on purple tint
+    // ── Double-height header ──────────────────────────────────────────
     painter->fillRect(x0, y0, total_w, header_h, QColor(148, 0, 211, 35));
-    painter->setPen(course_purple);
+
+    const int pad = std::max(2, cell / 8);
+    const int name_h = cell;          // top cell: course name
+    const int info_h = header_h - name_h;  // bottom cell: stats
+
+    // Course name (bold, top line)
     {
         QFont hf;
         hf.setPixelSize(std::max(8, static_cast<int>(cell_px * 0.45)));
         hf.setBold(true);
         painter->setFont(hf);
+        painter->setPen(course_purple);
+        painter->drawText(QRect(x0 + pad, y0, total_w - 2 * pad, name_h),
+                          Qt::AlignLeft | Qt::AlignVCenter,
+                          visible_course->name);
     }
-    const int pad = std::max(2, cell / 8);
-    painter->drawText(QRect(x0 + pad, y0, total_w - 2 * pad, header_h),
-                      Qt::AlignLeft | Qt::AlignVCenter,
-                      visible_course->name);
 
-    // Column grid lines
+    // Info line: "N КП  •  D km  •  ↑ H m"
+    {
+        QFont inf;
+        inf.setPixelSize(std::max(7, static_cast<int>(cell_px * 0.38)));
+        painter->setFont(inf);
+        painter->setPen(course_purple);
+
+        const int n_regular = rows.size();
+        const qreal dist_m  = computeCourseDistanceM(*visible_course);
+
+        QString info_text;
+        if (n_regular > 0)
+            info_text += tr("%n control(s)", "", n_regular);
+
+        if (dist_m > 0.5)
+        {
+            if (!info_text.isEmpty()) info_text += QLatin1String("  •  ");
+            if (dist_m >= 1000.0)
+                info_text += QString::number(dist_m / 1000.0, 'f', 1) + QLatin1String(" km");
+            else
+                info_text += QString::number(qRound(dist_m)) + QLatin1String(" m");
+        }
+
+        if (visible_course->climb_m > 0)
+        {
+            if (!info_text.isEmpty()) info_text += QLatin1String("  •  ");
+            info_text += QLatin1String("↑ ") + QString::number(visible_course->climb_m) + QLatin1String(" m");
+        }
+
+        painter->drawText(QRect(x0 + pad, y0 + name_h, total_w - 2 * pad, info_h),
+                          Qt::AlignLeft | Qt::AlignVCenter,
+                          info_text);
+    }
+
+    // Separator between header and data rows
     painter->setPen(QPen(course_purple, 1));
-    for (int c = 1; c < NCOLS; ++c)
-        painter->drawLine(x0 + c * cell, y0, x0 + c * cell, y0 + total_h);
+    painter->drawLine(x0, y0 + header_h, x0 + total_w, y0 + header_h);
 
-    // Data rows
+    // Column grid lines (only over data rows, not header)
+    for (int c = 1; c < NCOLS; ++c)
+        painter->drawLine(x0 + c * cell, y0 + header_h, x0 + c * cell, y0 + total_h);
+
+    int current_y = y0 + header_h;
+
+    // ── Start row ────────────────────────────────────────────────────
+    if (has_start)
+    {
+        painter->setPen(QPen(QColor(200, 200, 200), 1));
+        painter->drawLine(x0, current_y, x0 + total_w, current_y);
+
+        const QRectF start_cell(x0, current_y, cell, row_h);
+        paintStartCell(painter, start_cell);
+        current_y += row_h;
+    }
+
+    // ── Regular control rows ─────────────────────────────────────────
     QFont df;
     df.setPixelSize(std::max(7, static_cast<int>(cell_px * 0.40)));
     painter->setFont(df);
@@ -472,9 +618,8 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     for (int i = 0; i < rows.size(); ++i)
     {
         const auto& r = rows[i];
-        const int ry = y0 + header_h + i * row_h;
+        const int ry = current_y;
 
-        // Row separator
         painter->setPen(QPen(QColor(180, 180, 180), 1));
         painter->drawLine(x0, ry, x0 + total_w, ry);
 
@@ -482,16 +627,26 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
             QString::number(r.seq),
             r.code, r.part, r.feature, r.approach, r.dims, r.location, r.other
         };
-
         for (int c = 0; c < NCOLS; ++c)
         {
-            const QRectF cell_rect(x0 + c * cell, ry, cell, row_h);
             painter->setPen(Qt::black);
-            paintISCDCell(painter, cells[c], cell_rect, c);
+            paintISCDCell(painter, cells[c], QRectF(x0 + c * cell, ry, cell, row_h), c);
         }
+        current_y += row_h;
     }
 
-    // Outer border (redraw on top of content)
+    // ── Finish row ───────────────────────────────────────────────────
+    if (has_finish)
+    {
+        painter->setPen(QPen(QColor(200, 200, 200), 1));
+        painter->drawLine(x0, current_y, x0 + total_w, current_y);
+
+        const QRectF finish_cell(x0, current_y, cell, row_h);
+        paintFinishCell(painter, finish_cell);
+        current_y += row_h;
+    }
+
+    // Outer border
     painter->setPen(QPen(course_purple, 1));
     painter->setBrush(Qt::NoBrush);
     painter->drawRect(x0, y0, total_w, total_h);
