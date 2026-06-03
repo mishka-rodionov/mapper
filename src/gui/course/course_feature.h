@@ -25,6 +25,8 @@
 #include <QObject>
 #include <QPointer>
 
+#include "course/course_control.h"
+
 class QAction;
 class QWidget;
 
@@ -34,6 +36,7 @@ class CourseOverlay;
 class CoursePanelWidget;
 class EditorDockWidget;
 class MapEditorController;
+class PlaceControlTool;
 
 
 /**
@@ -79,6 +82,7 @@ private slots:
     void activatePlaceControlTool();
     void exportIofFull();
     void onControlSelectedInTool(const QString& control_id);
+    void onNextControlTypeChangeRequested(ControlType type);
 
 private:
     void createDockWidget();
@@ -88,6 +92,9 @@ private:
     std::unique_ptr<CourseOverlay>  course_overlay;
     QPointer<EditorDockWidget>      dock_widget;
     CoursePanelWidget*              panel = nullptr;
+
+    QPointer<PlaceControlTool>      current_tool;
+    ControlType                     next_control_type = ControlType::Regular;
 
     QAction* show_panel_act    = nullptr;
     QAction* place_control_act = nullptr;

@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include <QButtonGroup>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
@@ -30,6 +31,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTabWidget>
+#include <QToolButton>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
@@ -72,6 +74,50 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
 
     // ── Controls tab ──────────────────────────────────────────────
     {
+        // Type selector: four exclusive toggle buttons for Start / Control / Finish / Crossing.
+        // Clicking one sets the type that will be assigned to the next placed control.
+        type_btn_start    = new QToolButton;
+        type_btn_regular  = new QToolButton;
+        type_btn_finish   = new QToolButton;
+        type_btn_crossing = new QToolButton;
+
+        type_btn_start->setText(tr("△ Start"));
+        type_btn_regular->setText(tr("○ Control"));
+        type_btn_finish->setText(tr("◎ Finish"));
+        type_btn_crossing->setText(tr("✕ Crossing"));
+
+        type_btn_start->setToolTip(tr("Next placed control will be a Start (triangle)"));
+        type_btn_regular->setToolTip(tr("Next placed control will be a regular Control (circle)"));
+        type_btn_finish->setToolTip(tr("Next placed control will be a Finish (double circle)"));
+        type_btn_crossing->setToolTip(tr("Next placed control will be a Crossing Point"));
+
+        for (auto* btn : {type_btn_start, type_btn_regular, type_btn_finish, type_btn_crossing})
+        {
+            btn->setCheckable(true);
+            btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        }
+        type_btn_regular->setChecked(true);  // default
+
+        type_button_group = new QButtonGroup(this);
+        type_button_group->addButton(type_btn_start,    static_cast<int>(ControlType::Start));
+        type_button_group->addButton(type_btn_regular,  static_cast<int>(ControlType::Regular));
+        type_button_group->addButton(type_btn_finish,   static_cast<int>(ControlType::Finish));
+        type_button_group->addButton(type_btn_crossing, static_cast<int>(ControlType::CrossingPoint));
+        type_button_group->setExclusive(true);
+
+        connect(type_button_group, QOverload<int>::of(&QButtonGroup::buttonClicked),
+                this, [this](int id) {
+                    emit nextControlTypeChangeRequested(static_cast<ControlType>(id));
+                });
+
+        auto* type_row = new QHBoxLayout;
+        type_row->setSpacing(2);
+        type_row->setContentsMargins(0, 0, 0, 0);
+        type_row->addWidget(type_btn_start);
+        type_row->addWidget(type_btn_regular);
+        type_row->addWidget(type_btn_finish);
+        type_row->addWidget(type_btn_crossing);
+
         controls_tree = new QTreeWidget;
         controls_tree->setColumnCount(2);
         controls_tree->setHeaderLabels({tr("Code"), tr("Type")});
@@ -87,6 +133,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         properties_widget = new ControlPropertiesWidget(map, db);
 
         auto* layout = new QVBoxLayout;
+        layout->addLayout(type_row);
         layout->addWidget(controls_tree, 1);
         layout->addWidget(properties_widget);
         layout->setContentsMargins(4, 4, 4, 4);
@@ -171,6 +218,15 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
     // Initial population
     rebuildControlsTree();
     rebuildCoursesList();
+}
+
+
+// ── Type selector ─────────────────────────────────────────────────────────────
+
+void CoursePanelWidget::setNextControlType(ControlType type)
+{
+    if (auto* btn = type_button_group->button(static_cast<int>(type)))
+        btn->setChecked(true);
 }
 
 

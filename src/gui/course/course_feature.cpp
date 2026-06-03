@@ -102,9 +102,18 @@ void CourseFeature::activatePlaceControlTool()
 {
     auto* tool = new PlaceControlTool(&controller, place_control_act,
                                       controller.getMap()->courseDatabase());
+    tool->setNextControlType(next_control_type);
     connect(tool, &PlaceControlTool::selectedControlChanged,
             this, &CourseFeature::onControlSelectedInTool);
+    current_tool = tool;
     controller.setTool(tool);
+}
+
+void CourseFeature::onNextControlTypeChangeRequested(ControlType type)
+{
+    next_control_type = type;
+    if (current_tool)
+        current_tool->setNextControlType(type);
 }
 
 void CourseFeature::onControlSelectedInTool(const QString& control_id)
@@ -183,9 +192,10 @@ void CourseFeature::createDockWidget()
 
     connect(panel, &CoursePanelWidget::controlSelected,
             this, [this](const QString& id) {
-                // Zoom to control when double-clicked (future enhancement)
                 Q_UNUSED(id)
             });
+    connect(panel, &CoursePanelWidget::nextControlTypeChangeRequested,
+            this, &CourseFeature::onNextControlTypeChangeRequested);
 
     auto* main_window = controller.getWindow();
     dock_widget = new EditorDockWidget(tr("Course Planning"),

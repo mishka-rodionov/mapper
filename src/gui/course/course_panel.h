@@ -26,10 +26,13 @@
 #include <QWidget>
 
 #include "course/course.h"
+#include "course/course_control.h"
 
+class QButtonGroup;
 class QListWidget;
 class QPushButton;
 class QTabWidget;
+class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -60,9 +63,15 @@ public:
     /** Highlights the given control (e.g. after PlaceControlTool selects it). */
     void selectControl(const QString& control_id);
 
+    /** Reflects the current next-type selection in the type buttons. */
+    void setNextControlType(ControlType type);
+
 signals:
     /** Emitted when the user selects a control in the Controls tab. */
     void controlSelected(const QString& control_id);
+
+    /** Emitted when the user clicks a type button; CourseFeature forwards to the tool. */
+    void nextControlTypeChangeRequested(ControlType type);
 
 private slots:
     // Database change reactions
@@ -103,7 +112,13 @@ private:
 
     QTabWidget*   tabs            = nullptr;
 
-    // Controls tab
+    // Controls tab — type selector
+    QButtonGroup* type_button_group = nullptr;
+    QToolButton*  type_btn_start    = nullptr;
+    QToolButton*  type_btn_regular  = nullptr;
+    QToolButton*  type_btn_finish   = nullptr;
+    QToolButton*  type_btn_crossing = nullptr;
+
     QTreeWidget*              controls_tree     = nullptr;
     ControlPropertiesWidget*  properties_widget = nullptr;
 
