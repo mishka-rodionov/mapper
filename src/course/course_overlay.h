@@ -23,7 +23,11 @@
 #include <QObject>
 #include <QPointF>
 #include <QPolygonF>
+#include <QRectF>
 
+#include "core/map_coord.h"
+
+class QMouseEvent;
 class QPainter;
 
 namespace OpenOrienteering {
@@ -44,6 +48,10 @@ class MapWidget;
  *
  * Drawing uses screen (viewport) coordinates obtained via
  * MapWidget::mapToViewport(), matching the GPSDisplay approach.
+ *
+ * The IOF control description table (legend) is draggable: the user can
+ * left-click and drag it to any position on the map. The position is stored
+ * in map coordinates so it survives pan/zoom and prints at the correct place.
  */
 class CourseOverlay : public QObject
 {
@@ -74,11 +82,19 @@ public:
      */
     void paint(QPainter* painter);
 
+    /**
+     * Mouse event handlers called by MapWidget before tool dispatch.
+     * Return true if the event was consumed (legend was hit/dragged).
+     */
+    bool mousePressEvent(QMouseEvent* event);
+    bool mouseMoveEvent(QMouseEvent* event);
+    bool mouseReleaseEvent(QMouseEvent* event);
+
 private slots:
     void onDatabaseChanged();
 
 private:
-    // --- Paint helpers ---
+    // --- Course / control paint helpers ---
     void paintCourse(QPainter* painter, const Course& course) const;
     void paintAllControls(QPainter* painter) const;
 
@@ -89,6 +105,20 @@ private:
     void paintCrossingPoint(QPainter* painter, QPointF pos) const;
     void paintControlNumber(QPainter* painter, QPointF center, const QString& number) const;
 
+    // --- IOF description table ---
+    void paintDescriptionTable(QPainter* painter);
+
+    /** Draws the content of one ISCD cell.  column is 0-based (0=A … 7=H). */
+    void paintISCDCell(QPainter* painter, const QString& text,
+                       const QRectF& cell, int column) const;
+
+    // ISCD column-specific symbol renderers
+    void drawISCDFeatureSymbol(QPainter* painter, const QString& feature, const QRectF& r) const;
+    void drawISCDPartSymbol(QPainter* painter, const QString& part, const QRectF& r) const;
+    void drawISCDApproachSymbol(QPainter* painter, const QString& approach, const QRectF& r) const;
+    void drawISCDLocationSymbol(QPainter* painter, const QString& location, const QRectF& r) const;
+
+    // --- Coordinate conversion ---
     /** Converts a MapCoord (1/1000 mm) to viewport pixel coordinates. */
     QPointF toViewport(const CourseControl& ctrl) const;
 
@@ -98,14 +128,18 @@ private:
      */
     qreal mmToViewportPx(qreal mm) const;
 
-    /** Draws the IOF control description table for the visible course. */
-    void paintDescriptionTable(QPainter* painter) const;
-
     MapWidget* widget;
     const CourseDatabase& db;
     const Course* visible_course = nullptr;
 
     bool show_description_table = true;
+
+    // --- Legend drag state ---
+    MapCoordF legend_anchor;             ///< Top-left of legend in map coords (native units)
+    bool legend_anchor_initialized = false;
+    bool legend_dragging = false;
+    QPointF legend_drag_offset;          ///< Click pos relative to legend top-left (viewport px)
+    mutable QRectF legend_bounds_cache;  ///< Updated each paint; used for hit-testing
 };
 
 

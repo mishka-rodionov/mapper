@@ -1021,7 +1021,13 @@ void MapWidget::_mousePressEvent(QMouseEvent* event)
 		event->accept();
 		return;
 	}
-	
+
+	if (course_overlay && course_overlay->mousePressEvent(event))
+	{
+		event->accept();
+		return;
+	}
+
 	if (tool && tool->mousePressEvent(event, view->viewToMapF(viewportToView(event->pos())), this))
 	{
 		event->accept();
@@ -1066,7 +1072,13 @@ void MapWidget::_mouseMoveEvent(QMouseEvent* event)
     {
 		updateCursorposLabel(view->viewToMapF(viewportToView(event->pos())));
     }
-	
+
+	if (course_overlay && course_overlay->mouseMoveEvent(event))
+	{
+		event->accept();
+		return;
+	}
+
 	if (tool && tool->mouseMoveEvent(event, view->viewToMapF(viewportToView(event->pos())), this))
 	{
 		event->accept();
@@ -1094,7 +1106,13 @@ void MapWidget::_mouseReleaseEvent(QMouseEvent* event)
 		event->accept();
 		return;
 	}
-	
+
+	if (course_overlay && course_overlay->mouseReleaseEvent(event))
+	{
+		event->accept();
+		return;
+	}
+
 	if (tool && tool->mouseReleaseEvent(event, view->viewToMapF(viewportToView(event->pos())), this))
 	{
 		event->accept();
