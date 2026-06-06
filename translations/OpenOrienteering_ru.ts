@@ -4964,6 +4964,11 @@ selected</source>
         <source>Background drawing</source>
         <translation>Фоновый рисунок</translation>
     </message>
+    <message>
+        <location filename="../src/gui/map/map_editor.cpp" line="1289"/>
+        <source>&amp;Courses</source>
+        <translation>&amp;Дистанции</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::MapEditorTool</name>
@@ -9295,6 +9300,694 @@ Location: %2</source>
         <location filename="../src/fileformats/xml_file_format.cpp" line="984"/>
         <source>Expected %1 map parts, found %2.</source>
         <translation>Ожидалось %1 слоя(ёв) карты, найдено %2.</translation>
+    </message>
+</context>
+<context>
+    <name>OpenOrienteering::CoursePanelWidget</name>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="57"/>
+        <source>Start</source>
+        <translation>Старт</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="58"/>
+        <source>Finish</source>
+        <translation>Финиш</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="59"/>
+        <source>Crossing</source>
+        <translation>Пересечение</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="60"/>
+        <source>Control</source>
+        <translation>КП</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="85"/>
+        <source>△ Start</source>
+        <translation>△ Старт</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="86"/>
+        <source>○ Control</source>
+        <translation>○ КП</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="87"/>
+        <source>◎ Finish</source>
+        <translation>◎ Финиш</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="88"/>
+        <source>✕ Crossing</source>
+        <translation>✕ Пересечение</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="90"/>
+        <source>Next placed control will be a Start (triangle)</source>
+        <translation>Следующий КП будет стартом (треугольник)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="91"/>
+        <source>Next placed control will be a regular Control (circle)</source>
+        <translation>Следующий КП будет обычным пунктом (круг)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="92"/>
+        <source>Next placed control will be a Finish (double circle)</source>
+        <translation>Следующий КП будет финишем (двойной круг)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="93"/>
+        <source>Next placed control will be a Crossing Point</source>
+        <translation>Следующий КП будет точкой пересечения</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="124"/>
+        <source>Code</source>
+        <translation>Код</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="124"/>
+        <source>Type</source>
+        <translation>Тип</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="143"/>
+        <source>Controls</source>
+        <translation>КП</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="154"/>
+        <source>Rename</source>
+        <translation>Переименовать</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="156"/>
+        <source>Add course</source>
+        <translation>Добавить дистанцию</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="157"/>
+        <source>Rename selected course</source>
+        <translation>Переименовать выбранную дистанцию</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="158"/>
+        <source>Remove selected course</source>
+        <translation>Удалить выбранную дистанцию</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="174"/>
+        <source>Add selected</source>
+        <translation>Добавить выбранный</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="175"/>
+        <source>Remove</source>
+        <translation>Удалить</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="178"/>
+        <source>Add the control selected in the Controls tab to this course</source>
+        <translation>Добавить КП, выбранный во вкладке КП, к этой дистанции</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="179"/>
+        <source>Remove the selected entry from this course</source>
+        <translation>Удалить выбранный пункт из дистанции</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="194"/>
+        <source>Climb:</source>
+        <translation>Набор высоты:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="197"/>
+        <source> m</source>
+        <translation> м</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="198"/>
+        <source>Total climb along the course in meters (enter manually)</source>
+        <translation>Суммарный набор высоты по дистанции в метрах (ввод вручную)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="210"/>
+        <source>Courses:</source>
+        <translation>Дистанции:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="213"/>
+        <source>Entries:</source>
+        <translation>Пункты:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="220"/>
+        <source>Courses</source>
+        <translation>Дистанции</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="309"/>
+        <source>Delete control</source>
+        <translation>Удалить КП</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="420"/>
+        <source>New course</source>
+        <translation>Новая дистанция</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="421"/>
+        <source>Course name:</source>
+        <translation>Название дистанции:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="422"/>
+        <source>Course</source>
+        <translation>Дистанция</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="443"/>
+        <source>Rename course</source>
+        <translation>Переименовать дистанцию</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="444"/>
+        <source>New name:</source>
+        <translation>Новое название:</translation>
+    </message>
+</context>
+<context>
+    <name>OpenOrienteering::CourseFeature</name>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="54"/>
+        <source>Course &amp;Planning</source>
+        <translation>Планирование &amp;дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="61"/>
+        <source>Place &amp;Control</source>
+        <translation>Расставить &amp;КП</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="68"/>
+        <source>&amp;Export IOF (full course database)…</source>
+        <translation>&amp;Экспорт IOF (полная база дистанций)…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="133"/>
+        <location filename="../src/gui/course/course_feature.cpp" line="142"/>
+        <location filename="../src/gui/course/course_feature.cpp" line="163"/>
+        <location filename="../src/gui/course/course_feature.cpp" line="177"/>
+        <source>Export IOF</source>
+        <translation>Экспорт IOF</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="134"/>
+        <source>The course database is empty. Add controls and courses in the Course Planning panel first.</source>
+        <translation>База данных дистанций пуста. Сначала добавьте КП и дистанции в панели планирования дистанций.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="143"/>
+        <source>Export format not available.</source>
+        <translation>Формат экспорта недоступен.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="149"/>
+        <source>Export IOF Course Data</source>
+        <translation>Экспорт данных дистанций IOF</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="151"/>
+        <source>IOF Data Standard 3.0 (*.xml)</source>
+        <translation>IOF Data Standard 3.0 (*.xml)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="201"/>
+        <source>Course Planning</source>
+        <translation>Планирование дистанций</translation>
+    </message>
+</context>
+<context>
+    <name>OpenOrienteering::ControlPropertiesWidget</name>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="176"/>
+        <source>e.g. 101</source>
+        <translation>напр. 101</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="177"/>
+        <source>B – Code:</source>
+        <translation>B – Код:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="183"/>
+        <source>C – Part:</source>
+        <translation>C – Часть:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="189"/>
+        <source>D – Feature:</source>
+        <translation>D – Ориентир:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="195"/>
+        <source>E – Appearance:</source>
+        <translation>E – Вид:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="199"/>
+        <source>e.g. 2x1</source>
+        <translation>напр. 2x1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="200"/>
+        <source>F – Dimensions:</source>
+        <translation>F – Размеры:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="206"/>
+        <source>G – Location:</source>
+        <translation>G – Расположение:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="210"/>
+        <source>H – Other:</source>
+        <translation>H – Прочее:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/control_properties_widget.cpp" line="212"/>
+        <source>Control description</source>
+        <translation>Описание КП</translation>
+    </message>
+    <!-- IOF column C – feature part -->
+    <message>
+        <source>Northern</source>
+        <translation>Северная</translation>
+    </message>
+    <message>
+        <source>NE</source>
+        <translation>С-В</translation>
+    </message>
+    <message>
+        <source>Eastern</source>
+        <translation>Восточная</translation>
+    </message>
+    <message>
+        <source>SE</source>
+        <translation>Ю-В</translation>
+    </message>
+    <message>
+        <source>Southern</source>
+        <translation>Южная</translation>
+    </message>
+    <message>
+        <source>SW</source>
+        <translation>Ю-З</translation>
+    </message>
+    <message>
+        <source>Western</source>
+        <translation>Западная</translation>
+    </message>
+    <message>
+        <source>NW</source>
+        <translation>С-З</translation>
+    </message>
+    <message>
+        <source>Upper</source>
+        <translation>Верхняя</translation>
+    </message>
+    <message>
+        <source>Lower</source>
+        <translation>Нижняя</translation>
+    </message>
+    <message>
+        <source>Middle</source>
+        <translation>Средняя</translation>
+    </message>
+    <!-- IOF column D – feature (landforms) -->
+    <message>
+        <source>Depression</source>
+        <translation>Яма</translation>
+    </message>
+    <message>
+        <source>Small depression</source>
+        <translation>Маленькая яма</translation>
+    </message>
+    <message>
+        <source>Pit</source>
+        <translation>Карьер</translation>
+    </message>
+    <message>
+        <source>Broken ground</source>
+        <translation>Бугристая поверхность</translation>
+    </message>
+    <message>
+        <source>Re-entrant</source>
+        <translation>Лощина</translation>
+    </message>
+    <message>
+        <source>Spur</source>
+        <translation>Отрог</translation>
+    </message>
+    <message>
+        <source>Earth bank</source>
+        <translation>Земляная насыпь</translation>
+    </message>
+    <message>
+        <source>Erosion gully</source>
+        <translation>Промоина</translation>
+    </message>
+    <message>
+        <source>Hill</source>
+        <translation>Холм</translation>
+    </message>
+    <message>
+        <source>Knoll</source>
+        <translation>Бугор</translation>
+    </message>
+    <message>
+        <source>Saddle</source>
+        <translation>Седловина</translation>
+    </message>
+    <!-- IOF column D – feature (rock) -->
+    <message>
+        <source>Boulder</source>
+        <translation>Валун</translation>
+    </message>
+    <message>
+        <source>Boulder cluster</source>
+        <translation>Группа валунов</translation>
+    </message>
+    <message>
+        <source>Boulder field</source>
+        <translation>Валунное поле</translation>
+    </message>
+    <message>
+        <source>Cliff</source>
+        <translation>Скала</translation>
+    </message>
+    <message>
+        <source>Rock face</source>
+        <translation>Скальная стена</translation>
+    </message>
+    <message>
+        <source>Cave</source>
+        <translation>Пещера</translation>
+    </message>
+    <!-- IOF column D – feature (water) -->
+    <message>
+        <source>Lake / pond</source>
+        <translation>Озеро / пруд</translation>
+    </message>
+    <message>
+        <source>Marsh</source>
+        <translation>Болото</translation>
+    </message>
+    <message>
+        <source>Narrow marsh</source>
+        <translation>Узкое болото</translation>
+    </message>
+    <message>
+        <source>Firm ground in marsh</source>
+        <translation>Сухой остров в болоте</translation>
+    </message>
+    <message>
+        <source>Well / water tank</source>
+        <translation>Колодец / бак с водой</translation>
+    </message>
+    <message>
+        <source>River / stream</source>
+        <translation>Река / ручей</translation>
+    </message>
+    <message>
+        <source>Ditch / channel</source>
+        <translation>Канава / канал</translation>
+    </message>
+    <message>
+        <source>Source / spring</source>
+        <translation>Исток / родник</translation>
+    </message>
+    <!-- IOF column D – feature (vegetation) -->
+    <message>
+        <source>Open land</source>
+        <translation>Открытое пространство</translation>
+    </message>
+    <message>
+        <source>Forest corner</source>
+        <translation>Угол леса</translation>
+    </message>
+    <message>
+        <source>Clearing</source>
+        <translation>Поляна</translation>
+    </message>
+    <message>
+        <source>Copse</source>
+        <translation>Роща</translation>
+    </message>
+    <message>
+        <source>Linear thicket</source>
+        <translation>Полоса кустарника</translation>
+    </message>
+    <message>
+        <source>Distinctive tree</source>
+        <translation>Характерное дерево</translation>
+    </message>
+    <message>
+        <source>Charcoal burning ground</source>
+        <translation>Угольная яма</translation>
+    </message>
+    <!-- IOF column D – feature (man-made) -->
+    <message>
+        <source>Building</source>
+        <translation>Здание</translation>
+    </message>
+    <message>
+        <source>Ruin</source>
+        <translation>Руины</translation>
+    </message>
+    <message>
+        <source>Wall</source>
+        <translation>Стена</translation>
+    </message>
+    <message>
+        <source>Earth wall</source>
+        <translation>Земляной вал</translation>
+    </message>
+    <message>
+        <source>Fence</source>
+        <translation>Забор</translation>
+    </message>
+    <message>
+        <source>Path / track</source>
+        <translation>Тропа / дорожка</translation>
+    </message>
+    <message>
+        <source>Paved area</source>
+        <translation>Мощёная площадка</translation>
+    </message>
+    <message>
+        <source>Bridge</source>
+        <translation>Мост</translation>
+    </message>
+    <message>
+        <source>Crossing point</source>
+        <translation>Точка пересечения</translation>
+    </message>
+    <message>
+        <source>Tower</source>
+        <translation>Башня</translation>
+    </message>
+    <message>
+        <source>High-voltage line pylon</source>
+        <translation>Опора ЛЭП</translation>
+    </message>
+    <message>
+        <source>Boundary stone / cairn</source>
+        <translation>Межевой камень / тур</translation>
+    </message>
+    <message>
+        <source>Anthill / termite mound</source>
+        <translation>Муравейник</translation>
+    </message>
+    <message>
+        <source>Monument / statue</source>
+        <translation>Памятник / статуя</translation>
+    </message>
+    <message>
+        <source>Fodder rack</source>
+        <translation>Кормушка</translation>
+    </message>
+    <!-- IOF column E – appearance -->
+    <message>
+        <source>Shallow</source>
+        <translation>Мелкий</translation>
+    </message>
+    <message>
+        <source>Deep</source>
+        <translation>Глубокий</translation>
+    </message>
+    <message>
+        <source>Overgrown</source>
+        <translation>Заросший</translation>
+    </message>
+    <message>
+        <source>Open</source>
+        <translation>Открытый</translation>
+    </message>
+    <message>
+        <source>Rocky</source>
+        <translation>Скалистый</translation>
+    </message>
+    <message>
+        <source>Marshy</source>
+        <translation>Заболоченный</translation>
+    </message>
+    <message>
+        <source>Sandy</source>
+        <translation>Песчаный</translation>
+    </message>
+    <message>
+        <source>Ruined</source>
+        <translation>Разрушенный</translation>
+    </message>
+    <!-- IOF column G – location -->
+    <message>
+        <source>Top</source>
+        <translation>Вершина</translation>
+    </message>
+    <message>
+        <source>Upper part</source>
+        <translation>Верхняя часть</translation>
+    </message>
+    <message>
+        <source>Lower part</source>
+        <translation>Нижняя часть</translation>
+    </message>
+    <message>
+        <source>Foot</source>
+        <translation>Подножие</translation>
+    </message>
+    <message>
+        <source>Side</source>
+        <translation>Сторона</translation>
+    </message>
+    <message>
+        <source>N foot</source>
+        <translation>С подножие</translation>
+    </message>
+    <message>
+        <source>NE foot</source>
+        <translation>С-В подножие</translation>
+    </message>
+    <message>
+        <source>E foot</source>
+        <translation>В подножие</translation>
+    </message>
+    <message>
+        <source>SE foot</source>
+        <translation>Ю-В подножие</translation>
+    </message>
+    <message>
+        <source>S foot</source>
+        <translation>Ю подножие</translation>
+    </message>
+    <message>
+        <source>SW foot</source>
+        <translation>Ю-З подножие</translation>
+    </message>
+    <message>
+        <source>W foot</source>
+        <translation>З подножие</translation>
+    </message>
+    <message>
+        <source>NW foot</source>
+        <translation>С-З подножие</translation>
+    </message>
+    <message>
+        <source>N edge</source>
+        <translation>С край</translation>
+    </message>
+    <message>
+        <source>E edge</source>
+        <translation>В край</translation>
+    </message>
+    <message>
+        <source>S edge</source>
+        <translation>Ю край</translation>
+    </message>
+    <message>
+        <source>W edge</source>
+        <translation>З край</translation>
+    </message>
+    <message>
+        <source>N tip</source>
+        <translation>С конец</translation>
+    </message>
+    <message>
+        <source>E tip</source>
+        <translation>В конец</translation>
+    </message>
+    <message>
+        <source>S tip</source>
+        <translation>Ю конец</translation>
+    </message>
+    <message>
+        <source>W tip</source>
+        <translation>З конец</translation>
+    </message>
+    <message>
+        <source>N end</source>
+        <translation>Северный торец</translation>
+    </message>
+    <message>
+        <source>S end</source>
+        <translation>Южный торец</translation>
+    </message>
+    <message>
+        <source>Corner (inside)</source>
+        <translation>Угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>Corner (outside)</source>
+        <translation>Угол (внешний)</translation>
+    </message>
+    <message>
+        <source>Junction</source>
+        <translation>Развилка</translation>
+    </message>
+</context>
+<context>
+    <name>OpenOrienteering::PlaceControlTool</name>
+    <message>
+        <location filename="../src/tools/place_control_tool.cpp" line="266"/>
+        <source>&lt;b&gt;Drag&lt;/b&gt;: move control | &lt;b&gt;Escape&lt;/b&gt;: cancel drag</source>
+        <translation>&lt;b&gt;Перетащить&lt;/b&gt;: переместить КП | &lt;b&gt;Escape&lt;/b&gt;: отменить перемещение</translation>
+    </message>
+    <message>
+        <location filename="../src/tools/place_control_tool.cpp" line="270"/>
+        <source>&lt;b&gt;Click&lt;/b&gt;: place control | &lt;b&gt;Click control&lt;/b&gt;: select | &lt;b&gt;Delete&lt;/b&gt;: remove selected | &lt;b&gt;Escape&lt;/b&gt;: exit</source>
+        <translation>&lt;b&gt;Щелчок&lt;/b&gt;: поставить КП | &lt;b&gt;Щелчок на КП&lt;/b&gt;: выбрать | &lt;b&gt;Delete&lt;/b&gt;: удалить выбранный | &lt;b&gt;Escape&lt;/b&gt;: выйти</translation>
+    </message>
+    <message>
+        <location filename="../src/tools/place_control_tool.cpp" line="275"/>
+        <source>&lt;b&gt;Click&lt;/b&gt;: place control | &lt;b&gt;Click control&lt;/b&gt;: select | &lt;b&gt;Drag control&lt;/b&gt;: move | &lt;b&gt;Escape&lt;/b&gt;: exit</source>
+        <translation>&lt;b&gt;Щелчок&lt;/b&gt;: поставить КП | &lt;b&gt;Щелчок на КП&lt;/b&gt;: выбрать | &lt;b&gt;Перетащить КП&lt;/b&gt;: переместить | &lt;b&gt;Escape&lt;/b&gt;: выйти</translation>
+    </message>
+</context>
+<context>
+    <name>OpenOrienteering::CourseOverlay</name>
+    <message numerus="yes">
+        <location filename="../src/course/course_overlay.cpp" line="570"/>
+        <source>%n control(s)</source>
+        <translation>
+            <numerusform>%n контрольный пункт</numerusform>
+            <numerusform>%n контрольных пункта</numerusform>
+            <numerusform>%n контрольных пунктов</numerusform>
+        </translation>
     </message>
 </context>
 </TS>

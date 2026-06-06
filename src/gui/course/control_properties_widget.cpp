@@ -20,6 +20,7 @@
 #include "control_properties_widget.h"
 
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QLineEdit>
@@ -36,127 +37,159 @@ namespace OpenOrienteering {
 namespace {
 
 // IOF column C – which part of the feature
-const QStringList iof_feature_part = {
-    {},
-    QLatin1String("Northern"),
-    QLatin1String("NE"),
-    QLatin1String("Eastern"),
-    QLatin1String("SE"),
-    QLatin1String("Southern"),
-    QLatin1String("SW"),
-    QLatin1String("Western"),
-    QLatin1String("NW"),
-    QLatin1String("Upper"),
-    QLatin1String("Lower"),
-    QLatin1String("Middle"),
+const char* const iof_feature_part[] = {
+    "",
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Northern"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "NE"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Eastern"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "SE"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Southern"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "SW"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Western"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "NW"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Upper"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Lower"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Middle"),
+    nullptr
 };
 
 // IOF column D – main feature
-const QStringList iof_feature = {
-    {},
+const char* const iof_feature[] = {
+    "",
     // Landforms
-    QLatin1String("Depression"),
-    QLatin1String("Small depression"),
-    QLatin1String("Pit"),
-    QLatin1String("Broken ground"),
-    QLatin1String("Re-entrant"),
-    QLatin1String("Spur"),
-    QLatin1String("Earth bank"),
-    QLatin1String("Erosion gully"),
-    QLatin1String("Hill"),
-    QLatin1String("Knoll"),
-    QLatin1String("Saddle"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Depression"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Small depression"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Pit"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Broken ground"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Re-entrant"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Spur"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Earth bank"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Erosion gully"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Hill"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Knoll"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Saddle"),
     // Rock
-    QLatin1String("Boulder"),
-    QLatin1String("Boulder cluster"),
-    QLatin1String("Boulder field"),
-    QLatin1String("Cliff"),
-    QLatin1String("Rock face"),
-    QLatin1String("Cave"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Boulder"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Boulder cluster"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Boulder field"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Cliff"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Rock face"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Cave"),
     // Water
-    QLatin1String("Lake / pond"),
-    QLatin1String("Marsh"),
-    QLatin1String("Narrow marsh"),
-    QLatin1String("Firm ground in marsh"),
-    QLatin1String("Well / water tank"),
-    QLatin1String("River / stream"),
-    QLatin1String("Ditch / channel"),
-    QLatin1String("Source / spring"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Lake / pond"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Marsh"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Narrow marsh"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Firm ground in marsh"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Well / water tank"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "River / stream"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Ditch / channel"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Source / spring"),
     // Vegetation
-    QLatin1String("Open land"),
-    QLatin1String("Forest corner"),
-    QLatin1String("Clearing"),
-    QLatin1String("Copse"),
-    QLatin1String("Linear thicket"),
-    QLatin1String("Distinctive tree"),
-    QLatin1String("Charcoal burning ground"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Open land"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Forest corner"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Clearing"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Copse"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Linear thicket"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Distinctive tree"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Charcoal burning ground"),
     // Man-made
-    QLatin1String("Building"),
-    QLatin1String("Ruin"),
-    QLatin1String("Wall"),
-    QLatin1String("Earth wall"),
-    QLatin1String("Fence"),
-    QLatin1String("Path / track"),
-    QLatin1String("Paved area"),
-    QLatin1String("Bridge"),
-    QLatin1String("Crossing point"),
-    QLatin1String("Tower"),
-    QLatin1String("High-voltage line pylon"),
-    QLatin1String("Boundary stone / cairn"),
-    QLatin1String("Anthill / termite mound"),
-    QLatin1String("Monument / statue"),
-    QLatin1String("Fodder rack"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Building"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Ruin"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Wall"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Earth wall"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Fence"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Path / track"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Paved area"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Bridge"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Crossing point"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Tower"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "High-voltage line pylon"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Boundary stone / cairn"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Anthill / termite mound"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Monument / statue"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Fodder rack"),
+    nullptr
 };
 
 // IOF column E – appearance / characteristic
-const QStringList iof_approach = {
-    {},
-    QLatin1String("Shallow"),
-    QLatin1String("Deep"),
-    QLatin1String("Overgrown"),
-    QLatin1String("Open"),
-    QLatin1String("Rocky"),
-    QLatin1String("Marshy"),
-    QLatin1String("Sandy"),
-    QLatin1String("Ruined"),
+const char* const iof_approach[] = {
+    "",
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Shallow"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Deep"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Overgrown"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Open"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Rocky"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Marshy"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Sandy"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Ruined"),
+    nullptr
 };
 
 // IOF column G – location of the control flag
-const QStringList iof_location = {
-    {},
-    QLatin1String("Top"),
-    QLatin1String("Upper part"),
-    QLatin1String("Lower part"),
-    QLatin1String("Foot"),
-    QLatin1String("Side"),
-    QLatin1String("N foot"),
-    QLatin1String("NE foot"),
-    QLatin1String("E foot"),
-    QLatin1String("SE foot"),
-    QLatin1String("S foot"),
-    QLatin1String("SW foot"),
-    QLatin1String("W foot"),
-    QLatin1String("NW foot"),
-    QLatin1String("N edge"),
-    QLatin1String("E edge"),
-    QLatin1String("S edge"),
-    QLatin1String("W edge"),
-    QLatin1String("N tip"),
-    QLatin1String("E tip"),
-    QLatin1String("S tip"),
-    QLatin1String("W tip"),
-    QLatin1String("N end"),
-    QLatin1String("S end"),
-    QLatin1String("Corner (inside)"),
-    QLatin1String("Corner (outside)"),
-    QLatin1String("Junction"),
+const char* const iof_location[] = {
+    "",
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Top"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Upper part"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Lower part"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Side"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "N foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "NE foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "E foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "SE foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "S foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "SW foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "W foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "NW foot"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "N edge"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "E edge"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "S edge"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "W edge"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "N tip"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "E tip"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "S tip"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "W tip"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "N end"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "S end"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Corner (inside)"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Corner (outside)"),
+    QT_TRANSLATE_NOOP("OpenOrienteering::ControlPropertiesWidget", "Junction"),
+    nullptr
 };
 
-void populateCombo(QComboBox* combo, const QStringList& values)
+// Populates combo with translated display text; stores English key in Qt::UserRole.
+// This keeps saved data locale-independent.
+void populateCombo(QComboBox* combo, const char* const* items)
 {
+    static const char ctx[] = "OpenOrienteering::ControlPropertiesWidget";
     combo->clear();
-    for (const auto& v : values)
-        combo->addItem(v);
+    for (int i = 0; items[i] != nullptr; ++i)
+    {
+        const QLatin1String key(items[i]);
+        const QString text = key.size() > 0
+            ? QCoreApplication::translate(ctx, items[i])
+            : QString{};
+        combo->addItem(text, QString(key));
+    }
+}
+
+// Sets combo to item matching the English key stored in Qt::UserRole.
+// Falls back to setCurrentText for custom (user-typed) values.
+void setComboByKey(QComboBox* combo, const QString& key)
+{
+    const int idx = combo->findData(key);
+    if (idx >= 0)
+        combo->setCurrentIndex(idx);
+    else
+        combo->setCurrentText(key);
+}
+
+// Returns the English key for storage: UserRole data for predefined items,
+// currentText() for custom user-typed values.
+QString comboKey(const QComboBox* combo)
+{
+    const QVariant data = combo->currentData();
+    return data.isValid() ? data.toString() : combo->currentText();
 }
 
 }  // anonymous namespace
@@ -261,11 +294,11 @@ void ControlPropertiesWidget::setControl(const QString& id)
     {
         const auto& d = ctrl->description;
         code_edit->setText(d.code);
-        feature_part_combo->setCurrentText(d.feature_part);
-        feature_combo->setCurrentText(d.feature);
-        approach_combo->setCurrentText(d.approach);
+        setComboByKey(feature_part_combo, d.feature_part);
+        setComboByKey(feature_combo, d.feature);
+        setComboByKey(approach_combo, d.approach);
         dimensions_edit->setText(d.dimensions);
-        location_combo->setCurrentText(d.location_detail);
+        setComboByKey(location_combo, d.location_detail);
         other_edit->setText(d.other_info);
     }
 
@@ -311,11 +344,11 @@ void ControlPropertiesWidget::commit()
 
     ControlDescription new_desc;
     new_desc.code            = code_edit->text().trimmed();
-    new_desc.feature_part    = feature_part_combo->currentText();
-    new_desc.feature         = feature_combo->currentText();
-    new_desc.approach        = approach_combo->currentText();
+    new_desc.feature_part    = comboKey(feature_part_combo);
+    new_desc.feature         = comboKey(feature_combo);
+    new_desc.approach        = comboKey(approach_combo);
     new_desc.dimensions      = dimensions_edit->text().trimmed();
-    new_desc.location_detail = location_combo->currentText();
+    new_desc.location_detail = comboKey(location_combo);
     new_desc.other_info      = other_edit->text().trimmed();
 
     const ControlDescription old_desc = db.control(index).description;
