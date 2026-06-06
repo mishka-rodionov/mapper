@@ -74,6 +74,9 @@ public:
     /** Action to export all courses as IOF 3.0 XML (full course database). */
     QAction* exportIofFullAction() { return export_iof_act; }
 
+    /** Action to open the ISCD symbol reference browser (development aid). */
+    QAction* symbolBrowserAction() { return symbol_browser_act; }
+
     /** Returns the CourseOverlay owned by this feature. */
     CourseOverlay* overlay() const { return course_overlay.get(); }
 
@@ -81,6 +84,7 @@ private slots:
     void showPanelToggled(bool show);
     void activatePlaceControlTool();
     void exportIofFull();
+    void openSymbolBrowser();
     void onControlSelectedInTool(const QString& control_id);
     void onNextControlTypeChangeRequested(ControlType type);
 
@@ -96,9 +100,10 @@ private:
     QPointer<PlaceControlTool>      current_tool;
     ControlType                     next_control_type = ControlType::Regular;
 
-    QAction* show_panel_act    = nullptr;
-    QAction* place_control_act = nullptr;
-    QAction* export_iof_act    = nullptr;
+    QAction* show_panel_act      = nullptr;
+    QAction* place_control_act   = nullptr;
+    QAction* export_iof_act      = nullptr;
+    QAction* symbol_browser_act  = nullptr;
 };
 
 

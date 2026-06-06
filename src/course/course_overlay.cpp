@@ -697,7 +697,7 @@ void CourseOverlay::paintISCDCell(QPainter* painter, const QString& text,
 
 void CourseOverlay::drawISCDFeatureSymbol(QPainter* painter,
                                            const QString& feature,
-                                           const QRectF& rect) const
+                                           const QRectF& rect)
 {
     const qreal cx = rect.center().x();
     const qreal cy = rect.center().y();
@@ -708,112 +708,88 @@ void CourseOverlay::drawISCDFeatureSymbol(QPainter* painter,
 
     painter->save();
     painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter->setBrush(Qt::black);
+    painter->setBrush(Qt::NoBrush);
+
+    // Draw filled equilateral triangle pointing up, centred at (cx_t, cy_t), height h_t
+    auto drawTriangle = [&](qreal cx_t, qreal cy_t, qreal h_t, bool filled) {
+        const qreal hb = h_t / std::sqrt(3.0);
+        QPolygonF tri;
+        tri << QPointF(cx_t,      cy_t - h_t * 2.0 / 3.0)
+            << QPointF(cx_t + hb, cy_t + h_t / 3.0)
+            << QPointF(cx_t - hb, cy_t + h_t / 3.0);
+        if (filled) painter->setBrush(Qt::black); else painter->setBrush(Qt::NoBrush);
+        painter->drawPolygon(tri);
+        painter->setBrush(Qt::NoBrush);
+    };
 
     const QString f = feature.toLower();
 
-    // ---- Terrain features ----
+    // ---- Terrain features (IOF 1.x) ----
 
-    if (f == QLatin1String("boulder"))
+    if (f == QLatin1String("re-entrant") || f == QLatin1String("re entrant"))
     {
-        // Filled irregular polygon
-        QPolygonF poly;
-        poly << QPointF(cx - r * 0.25, cy - r)
-             << QPointF(cx + r * 0.65, cy - r * 0.45)
-             << QPointF(cx + r * 0.90, cy + r * 0.20)
-             << QPointF(cx + r * 0.45, cy + r * 0.85)
-             << QPointF(cx - r * 0.40, cy + r * 0.90)
-             << QPointF(cx - r * 0.90, cy + r * 0.25)
-             << QPointF(cx - r * 0.80, cy - r * 0.55);
-        painter->drawPolygon(poly);
-    }
-    else if (f == QLatin1String("boulder cluster") || f == QLatin1String("cluster of boulders"))
-    {
-        // Three filled circles in triangular arrangement
-        const qreal br = r * 0.38;
-        painter->drawEllipse(QPointF(cx, cy - r * 0.45), br, br);
-        painter->drawEllipse(QPointF(cx - r * 0.52, cy + r * 0.35), br, br);
-        painter->drawEllipse(QPointF(cx + r * 0.52, cy + r * 0.35), br, br);
-    }
-    else if (f == QLatin1String("boulder field") || f == QLatin1String("stony ground"))
-    {
-        // Many small dots
-        const qreal dr = r * 0.18;
-        painter->drawEllipse(QPointF(cx - r * 0.55, cy - r * 0.55), dr, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.10, cy - r * 0.65), dr, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.60, cy - r * 0.35), dr, dr);
-        painter->drawEllipse(QPointF(cx - r * 0.70, cy + r * 0.10), dr, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.00, cy + r * 0.10), dr, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.65, cy + r * 0.20), dr, dr);
-        painter->drawEllipse(QPointF(cx - r * 0.35, cy + r * 0.60), dr, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.40, cy + r * 0.65), dr, dr);
-    }
-    else if (f == QLatin1String("depression") || f == QLatin1String("small depression"))
-    {
-        // U-shaped arc with inward tick marks (depression contour)
-        painter->setBrush(Qt::NoBrush);
-        QPainterPath path;
-        path.moveTo(cx - r, cy);
-        path.cubicTo(cx - r, cy + r * 1.1,
-                     cx + r, cy + r * 1.1,
-                     cx + r, cy);
-        painter->drawPath(path);
-        // Tick marks pointing inward (downward into the depression)
-        const qreal tick = r * 0.28;
-        for (int k = 0; k < 5; ++k)
-        {
-            const qreal angle = M_PI * 0.15 + k * M_PI * 0.175;
-            const QPointF p(cx + r * std::cos(M_PI - angle), cy + r * 0.6 * std::sin(M_PI - angle) + r * 0.4);
-            // Simple inward ticks along the arc
-            Q_UNUSED(p);
-        }
-        // Simpler: just draw 4 tick marks on the curve
-        const qreal ticklen = r * 0.25;
-        for (int k = 1; k <= 4; ++k)
-        {
-            const qreal t = k / 5.0;  // param 0..1
-            const qreal bx = cx - r + 2 * r * t;
-            const qreal by = cy + r * 1.1 * 4 * t * (1 - t);  // approx bezier top
-            painter->drawLine(QPointF(bx, by), QPointF(bx, by + ticklen));
-        }
-    }
-    else if (f == QLatin1String("pit") || f == QLatin1String("erosion gully"))
-    {
-        // Circle with filled centre dot
-        painter->setBrush(Qt::NoBrush);
-        painter->drawEllipse(QPointF(cx, cy), r, r);
-        painter->setBrush(Qt::black);
-        painter->drawEllipse(QPointF(cx, cy), r * 0.25, r * 0.25);
-    }
-    else if (f == QLatin1String("knoll"))
-    {
-        // Small filled oval
-        painter->drawEllipse(QPointF(cx, cy), r * 0.65, r * 0.5);
-    }
-    else if (f == QLatin1String("hill"))
-    {
-        // Half-ellipse on baseline
+        // 1.3 Лощина: ∩ arch open at bottom
         QPainterPath path;
         path.moveTo(cx - r, cy + r * 0.2);
         path.cubicTo(cx - r, cy - r * 0.9,
                      cx + r, cy - r * 0.9,
                      cx + r, cy + r * 0.2);
-        path.closeSubpath();
-        painter->setBrush(Qt::black);
         painter->drawPath(path);
+    }
+    else if (f == QLatin1String("spur"))
+    {
+        // 1.2 Нос: wedge pointing right — two lines converging at right apex
+        painter->drawLine(QPointF(cx - r,       cy - r * 0.55), QPointF(cx + r * 0.75, cy));
+        painter->drawLine(QPointF(cx - r,       cy + r * 0.55), QPointF(cx + r * 0.75, cy));
+    }
+    else if (f == QLatin1String("earth bank") || f == QLatin1String("embankment"))
+    {
+        // 1.4 Грунтовый обрыв: thick horizontal + 5 downward ticks
+        painter->setPen(QPen(Qt::black, lw * 2.5, Qt::SolidLine, Qt::FlatCap));
+        painter->drawLine(QPointF(cx - r, cy - r * 0.2), QPointF(cx + r, cy - r * 0.2));
+        painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::FlatCap));
+        for (int k = 0; k < 5; ++k)
+        {
+            const qreal tx = cx - r + (2.0 * r * k) / 4.0;
+            painter->drawLine(QPointF(tx, cy - r * 0.2), QPointF(tx, cy + r * 0.5));
+        }
+    }
+    else if (f == QLatin1String("erosion gully"))
+    {
+        // 1.7 Промоина: ∧ two lines meeting at apex (top)
+        painter->drawLine(QPointF(cx - r, cy + r * 0.55), QPointF(cx, cy - r * 0.55));
+        painter->drawLine(QPointF(cx,     cy - r * 0.55), QPointF(cx + r, cy + r * 0.55));
+    }
+    else if (f == QLatin1String("pit"))
+    {
+        // 1.5 Карьер: arc open at top (C-shape, rotated to open upward)
+        QPainterPath path;
+        path.moveTo(cx - r * 0.8, cy - r * 0.2);
+        path.cubicTo(cx - r * 0.8, cy + r * 1.0,
+                     cx + r * 0.8, cy + r * 1.0,
+                     cx + r * 0.8, cy - r * 0.2);
+        painter->drawPath(path);
+    }
+    else if (f == QLatin1String("hill"))
+    {
+        // 1.9 Бугор: oval outline only (no fill)
+        painter->drawEllipse(QPointF(cx, cy), r * 0.85, r * 0.6);
+    }
+    else if (f == QLatin1String("knoll"))
+    {
+        // 1.10 Бугорок: small filled circle
+        painter->setBrush(Qt::black);
+        painter->drawEllipse(QPointF(cx, cy), r * 0.42, r * 0.42);
     }
     else if (f == QLatin1String("saddle"))
     {
-        // Two opposing half-arcs
-        painter->setBrush(Qt::NoBrush);
-        // Top arc (concave downward)
+        // 1.11 Седло: )( two opposing arcs
         QPainterPath p1;
         p1.moveTo(cx - r, cy - r * 0.15);
         p1.cubicTo(cx - r * 0.5, cy - r * 0.8,
                    cx + r * 0.5, cy - r * 0.8,
                    cx + r, cy - r * 0.15);
         painter->drawPath(p1);
-        // Bottom arc (concave upward)
         QPainterPath p2;
         p2.moveTo(cx - r, cy + r * 0.15);
         p2.cubicTo(cx - r * 0.5, cy + r * 0.8,
@@ -821,308 +797,378 @@ void CourseOverlay::drawISCDFeatureSymbol(QPainter* painter,
                    cx + r, cy + r * 0.15);
         painter->drawPath(p2);
     }
-    else if (f == QLatin1String("re-entrant") || f == QLatin1String("re entrant"))
+    else if (f == QLatin1String("depression"))
     {
-        // V-shape of contour arcs pointing inward (toward center)
-        painter->setBrush(Qt::NoBrush);
+        // 1.12 Яма: horizontal ellipse + horizontal bar through centre
+        painter->drawEllipse(QPointF(cx, cy), r * 0.85, r * 0.55);
+        painter->drawLine(QPointF(cx - r * 0.85, cy), QPointF(cx + r * 0.85, cy));
+    }
+    else if (f == QLatin1String("small depression"))
+    {
+        // 1.13 Небольшая ямка: simple U arc
+        QPainterPath path;
+        path.moveTo(cx - r * 0.75, cy - r * 0.2);
+        path.cubicTo(cx - r * 0.75, cy + r * 0.75,
+                     cx + r * 0.75, cy + r * 0.75,
+                     cx + r * 0.75, cy - r * 0.2);
+        painter->drawPath(path);
+    }
+    else if (f == QLatin1String("broken ground"))
+    {
+        // 1.15 Изрытая поверхность: two small U arcs side by side
         QPainterPath p1;
-        p1.moveTo(cx - r, cy - r * 0.1);
-        p1.cubicTo(cx - r * 0.4, cy - r * 0.5, cx - r * 0.1, cy - r * 0.6, cx, cy);
+        p1.moveTo(cx - r,        cy - r * 0.1);
+        p1.cubicTo(cx - r,       cy + r * 0.65,
+                   cx - r * 0.1, cy + r * 0.65,
+                   cx - r * 0.1, cy - r * 0.1);
         painter->drawPath(p1);
         QPainterPath p2;
-        p2.moveTo(cx + r, cy - r * 0.1);
-        p2.cubicTo(cx + r * 0.4, cy - r * 0.5, cx + r * 0.1, cy - r * 0.6, cx, cy);
+        p2.moveTo(cx + r * 0.1, cy - r * 0.1);
+        p2.cubicTo(cx + r * 0.1, cy + r * 0.65,
+                   cx + r,       cy + r * 0.65,
+                   cx + r,       cy - r * 0.1);
         painter->drawPath(p2);
     }
-    else if (f == QLatin1String("spur"))
+    else if (f == QLatin1String("anthill") || f == QLatin1String("termite mound") ||
+             f == QLatin1String("anthill / termite mound"))
     {
-        // V-shape opening outward (pointing up)
-        painter->setBrush(Qt::NoBrush);
-        QPainterPath p1;
-        p1.moveTo(cx, cy);
-        p1.cubicTo(cx - r * 0.1, cy - r * 0.6, cx - r * 0.4, cy - r * 0.5, cx - r, cy + r * 0.1);
-        painter->drawPath(p1);
-        QPainterPath p2;
-        p2.moveTo(cx, cy);
-        p2.cubicTo(cx + r * 0.1, cy - r * 0.6, cx + r * 0.4, cy - r * 0.5, cx + r, cy + r * 0.1);
-        painter->drawPath(p2);
-    }
-    else if (f == QLatin1String("earth bank") || f == QLatin1String("embankment"))
-    {
-        // Thick horizontal line with downward tick marks
-        painter->setBrush(Qt::NoBrush);
-        painter->setPen(QPen(Qt::black, lw * 2, Qt::SolidLine, Qt::FlatCap));
-        painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
-        painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::FlatCap));
-        const int nticks = 5;
-        for (int k = 0; k < nticks; ++k)
+        // 1.16 Муравейник: 6-armed asterisk (60° between arms)
+        for (int k = 0; k < 6; ++k)
         {
-            const qreal tx = cx - r + (2.0 * r * k) / (nticks - 1);
-            painter->drawLine(QPointF(tx, cy), QPointF(tx, cy + r * 0.55));
+            const qreal angle = k * M_PI / 3.0;
+            painter->drawLine(QPointF(cx, cy),
+                              QPointF(cx + r * std::cos(angle),
+                                      cy + r * std::sin(angle)));
         }
     }
-    else if (f == QLatin1String("broken ground") || f == QLatin1String("rough open land"))
-    {
-        // Three small irregular shapes
-        const qreal dr = r * 0.22;
-        painter->drawEllipse(QPointF(cx - r * 0.55, cy), dr * 1.3, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.10, cy - r * 0.35), dr, dr * 1.2);
-        painter->drawEllipse(QPointF(cx + r * 0.55, cy + r * 0.20), dr * 1.1, dr);
-    }
 
-    // ---- Rock ----
+    // ---- Rock (IOF 2.x) ----
 
     else if (f == QLatin1String("cliff") || f == QLatin1String("rock face"))
     {
-        // Horizontal line with downward vertical marks (cliff symbol)
-        painter->setBrush(Qt::NoBrush);
+        // 2.1 Утес: thick horizontal + 5 even downward ticks
         painter->setPen(QPen(Qt::black, lw * 2.5, Qt::SolidLine, Qt::FlatCap));
         painter->drawLine(QPointF(cx - r, cy - r * 0.15), QPointF(cx + r, cy - r * 0.15));
         painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::FlatCap));
-        const int nticks = 6;
-        for (int k = 0; k < nticks; ++k)
+        for (int k = 0; k < 5; ++k)
         {
-            const qreal tx = cx - r + (2.0 * r * k) / (nticks - 1);
-            const qreal len = (k % 2 == 0) ? r * 0.7 : r * 0.45;
-            painter->drawLine(QPointF(tx, cy - r * 0.15), QPointF(tx, cy - r * 0.15 + len));
+            const qreal tx = cx - r + (2.0 * r * k) / 4.0;
+            painter->drawLine(QPointF(tx, cy - r * 0.15), QPointF(tx, cy + r * 0.6));
         }
     }
     else if (f == QLatin1String("cave"))
     {
-        // Open arch at bottom
-        painter->setBrush(Qt::NoBrush);
-        QPainterPath path;
-        path.moveTo(cx - r * 0.7, cy + r * 0.3);
-        path.cubicTo(cx - r * 0.7, cy - r * 0.8,
-                     cx + r * 0.7, cy - r * 0.8,
-                     cx + r * 0.7, cy + r * 0.3);
-        painter->drawPath(path);
-        painter->drawLine(QPointF(cx - r * 0.7, cy + r * 0.3), QPointF(cx - r, cy + r * 0.3));
-        painter->drawLine(QPointF(cx + r * 0.7, cy + r * 0.3), QPointF(cx + r, cy + r * 0.3));
+        // 2.3 Пещера: 4 diagonal lines converging from corners to centre
+        const qreal d = r * 0.75;
+        painter->drawLine(QPointF(cx - d, cy - d), QPointF(cx, cy));
+        painter->drawLine(QPointF(cx + d, cy - d), QPointF(cx, cy));
+        painter->drawLine(QPointF(cx - d, cy + d), QPointF(cx, cy));
+        painter->drawLine(QPointF(cx + d, cy + d), QPointF(cx, cy));
     }
-    else if (f == QLatin1String("rocky ground") || f == QLatin1String("rock pillars") || f == QLatin1String("stone wall"))
+    else if (f == QLatin1String("boulder"))
     {
-        // Zigzag line
-        painter->setBrush(Qt::NoBrush);
-        QPolygonF zz;
-        const int nz = 5;
-        for (int k = 0; k <= nz; ++k)
-        {
-            const qreal zx = cx - r + (2.0 * r * k) / nz;
-            const qreal zy = (k % 2 == 0) ? cy - r * 0.3 : cy + r * 0.3;
-            zz << QPointF(zx, zy);
-        }
-        painter->drawPolyline(zz);
+        // 2.4 Валун: filled equilateral triangle
+        drawTriangle(cx, cy + r * 0.1, r * 0.95, true);
+    }
+    else if (f == QLatin1String("boulder field"))
+    {
+        // 2.5 Валунное поле: 3 scattered filled triangles
+        drawTriangle(cx,            cy - r * 0.15, r * 0.55, true);
+        drawTriangle(cx - r * 0.52, cy + r * 0.42, r * 0.45, true);
+        drawTriangle(cx + r * 0.52, cy + r * 0.42, r * 0.45, true);
+    }
+    else if (f == QLatin1String("boulder cluster") || f == QLatin1String("cluster of boulders"))
+    {
+        // 2.6 Скопление валунов: big + small triangle
+        drawTriangle(cx - r * 0.22, cy + r * 0.05, r * 0.72, true);
+        drawTriangle(cx + r * 0.52, cy + r * 0.2,  r * 0.46, true);
     }
 
-    // ---- Water ----
+    // ---- Water (IOF 3.x) ----
 
     else if (f == QLatin1String("lake") || f == QLatin1String("pond") ||
-             f == QLatin1String("pool"))
+             f == QLatin1String("pool") || f == QLatin1String("lake / pond"))
     {
-        // Filled oval
-        painter->drawEllipse(QPointF(cx, cy), r, r * 0.65);
+        // 3.1/3.2 Водоём/Пруд: 3 parallel wavy horizontal lines
+        for (int row = -1; row <= 1; ++row)
+        {
+            const qreal wy = cy + row * r * 0.38;
+            QPainterPath wave;
+            wave.moveTo(cx - r, wy);
+            wave.cubicTo(cx - r * 0.5, wy - r * 0.22,
+                         cx,           wy + r * 0.22,
+                         cx + r * 0.5, wy - r * 0.22);
+            wave.cubicTo(cx + r * 0.75, wy - r * 0.3,
+                         cx + r,        wy,
+                         cx + r,        wy);
+            painter->drawPath(wave);
+        }
     }
-    else if (f == QLatin1String("marsh") || f == QLatin1String("narrow marsh") ||
-             f == QLatin1String("indistinct marsh") || f == QLatin1String("firm ground in marsh"))
+    else if (f == QLatin1String("marsh"))
     {
-        // Three vertical lines with wavy baseline
-        painter->setBrush(Qt::NoBrush);
-        const qreal base = cy + r * 0.5;
-        // Wavy base
+        // 3.7 Болото: 3 horizontal straight lines (≡)
+        for (int row = -1; row <= 1; ++row)
+            painter->drawLine(QPointF(cx - r * 0.85, cy + row * r * 0.38),
+                              QPointF(cx + r * 0.85, cy + row * r * 0.38));
+    }
+    else if (f == QLatin1String("narrow marsh"))
+    {
+        // 3.6 Узкое болото: two horizontal dotted lines
+        painter->setPen(QPen(Qt::black, lw * 1.5, Qt::DotLine, Qt::RoundCap));
+        painter->drawLine(QPointF(cx - r * 0.85, cy - r * 0.22),
+                          QPointF(cx + r * 0.85, cy - r * 0.22));
+        painter->drawLine(QPointF(cx - r * 0.85, cy + r * 0.22),
+                          QPointF(cx + r * 0.85, cy + r * 0.22));
+    }
+    else if (f == QLatin1String("firm ground in marsh"))
+    {
+        // 3.8 Сухое место: solid + dashed + solid alternating lines
+        painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::FlatCap));
+        painter->drawLine(QPointF(cx - r * 0.85, cy - r * 0.38),
+                          QPointF(cx + r * 0.85, cy - r * 0.38));
+        painter->setPen(QPen(Qt::black, lw, Qt::DashLine, Qt::FlatCap));
+        painter->drawLine(QPointF(cx - r * 0.85, cy),
+                          QPointF(cx + r * 0.85, cy));
+        painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::FlatCap));
+        painter->drawLine(QPointF(cx - r * 0.85, cy + r * 0.38),
+                          QPointF(cx + r * 0.85, cy + r * 0.38));
+    }
+    else if (f == QLatin1String("well") || f == QLatin1String("water tank") ||
+             f == QLatin1String("cistern") || f == QLatin1String("well / water tank"))
+    {
+        // 3.9/3.11 Колодец/Резервуар: circle outline + wavy tail below
+        painter->drawEllipse(QPointF(cx, cy - r * 0.22), r * 0.44, r * 0.44);
         QPainterPath wave;
-        wave.moveTo(cx - r, base);
-        wave.cubicTo(cx - r * 0.5, base - r * 0.25,
-                     cx,            base + r * 0.25,
-                     cx + r * 0.5,  base - r * 0.25);
-        wave.cubicTo(cx + r * 0.75, base - r * 0.38,
-                     cx + r,        base,
-                     cx + r,        base);
+        wave.moveTo(cx, cy + r * 0.22);
+        wave.cubicTo(cx - r * 0.28, cy + r * 0.45,
+                     cx + r * 0.28, cy + r * 0.65,
+                     cx,            cy + r * 0.88);
         painter->drawPath(wave);
-        // Three vertical strokes
-        painter->drawLine(QPointF(cx - r * 0.5, cy - r * 0.5), QPointF(cx - r * 0.5, base));
-        painter->drawLine(QPointF(cx,            cy - r * 0.6), QPointF(cx,           base));
-        painter->drawLine(QPointF(cx + r * 0.5,  cy - r * 0.5), QPointF(cx + r * 0.5, base));
     }
-    else if (f == QLatin1String("stream") || f == QLatin1String("river") ||
-             f == QLatin1String("major river") || f == QLatin1String("wide stream"))
+    else if (f == QLatin1String("river") || f == QLatin1String("stream") ||
+             f == QLatin1String("major river") || f == QLatin1String("wide stream") ||
+             f == QLatin1String("river / stream"))
     {
-        // Wavy horizontal line
-        painter->setBrush(Qt::NoBrush);
+        // 3.4 Речка: double-period zigzag wave
+        const qreal amp = r * 0.38;
         QPainterPath wave;
         wave.moveTo(cx - r, cy);
-        wave.cubicTo(cx - r * 0.5, cy - r * 0.4,
-                     cx,           cy + r * 0.4,
-                     cx + r * 0.5, cy - r * 0.4);
-        wave.cubicTo(cx + r * 0.75, cy - r * 0.55,
-                     cx + r,        cy,
-                     cx + r,        cy);
+        wave.cubicTo(cx - r * 0.75, cy - amp, cx - r * 0.25, cy + amp, cx, cy);
+        wave.cubicTo(cx + r * 0.25, cy - amp, cx + r * 0.75, cy + amp, cx + r, cy);
         painter->drawPath(wave);
     }
     else if (f == QLatin1String("ditch") || f == QLatin1String("channel") ||
-             f == QLatin1String("trench"))
+             f == QLatin1String("trench") || f == QLatin1String("ditch / channel"))
     {
-        // Two close parallel horizontal lines
-        painter->setBrush(Qt::NoBrush);
+        // Two parallel horizontal lines
         const qreal gap = r * 0.3;
         painter->drawLine(QPointF(cx - r, cy - gap), QPointF(cx + r, cy - gap));
         painter->drawLine(QPointF(cx - r, cy + gap), QPointF(cx + r, cy + gap));
     }
-    else if (f == QLatin1String("well") || f == QLatin1String("water tank") ||
-             f == QLatin1String("cistern") || f == QLatin1String("spring") ||
-             f == QLatin1String("source"))
+    else if (f == QLatin1String("spring") || f == QLatin1String("source") ||
+             f == QLatin1String("source / spring"))
     {
-        // Square with cross inside
-        painter->setBrush(Qt::NoBrush);
-        const qreal s = r * 0.75;
-        painter->drawRect(QRectF(cx - s, cy - s, 2 * s, 2 * s));
-        painter->drawLine(QPointF(cx - s, cy), QPointF(cx + s, cy));
-        painter->drawLine(QPointF(cx, cy - s), QPointF(cx, cy + s));
+        // 3.10 Родник: S-curve (source flowing outward)
+        QPainterPath path;
+        path.moveTo(cx - r, cy);
+        path.cubicTo(cx - r * 0.5, cy - r * 0.6,
+                     cx - r * 0.2, cy - r * 0.6,
+                     cx - r * 0.2, cy);
+        path.cubicTo(cx - r * 0.2, cy + r * 0.5,
+                     cx + r,       cy + r * 0.5,
+                     cx + r,       cy);
+        painter->drawPath(path);
     }
 
-    // ---- Vegetation ----
+    // ---- Vegetation (IOF 4.x) ----
 
     else if (f == QLatin1String("open land") || f == QLatin1String("field") ||
              f == QLatin1String("cultivated land"))
     {
-        // Three evenly spaced horizontal lines (open-land stipple)
-        painter->setBrush(Qt::NoBrush);
-        const qreal spacing = h / 4.0;
-        for (int k = 1; k <= 3; ++k)
-        {
-            const qreal ly = rect.top() + spacing * k;
-            painter->drawLine(QPointF(cx - r * 0.85, ly), QPointF(cx + r * 0.85, ly));
-        }
+        // 4.1 Открытое пространство: diamond outline (◇)
+        QPolygonF diamond;
+        diamond << QPointF(cx,     cy - r * 0.9)
+                << QPointF(cx + r, cy)
+                << QPointF(cx,     cy + r * 0.9)
+                << QPointF(cx - r, cy);
+        painter->drawPolygon(diamond);
     }
-    else if (f == QLatin1String("distinct tree") || f == QLatin1String("distinctive tree"))
+    else if (f == QLatin1String("forest corner"))
     {
-        // Lollipop: circle on a vertical stick
-        painter->drawEllipse(QPointF(cx, cy - r * 0.4), r * 0.45, r * 0.45);
-        painter->drawLine(QPointF(cx, cy - r * 0.0), QPointF(cx, cy + r * 0.7));
-        painter->drawLine(QPointF(cx - r * 0.35, cy + r * 0.7),
-                          QPointF(cx + r * 0.35, cy + r * 0.7));
+        // 4.3 Угол леса: two lines forming acute angle pointing left (◁)
+        painter->drawLine(QPointF(cx + r * 0.7, cy - r * 0.7), QPointF(cx - r * 0.6, cy));
+        painter->drawLine(QPointF(cx - r * 0.6, cy),           QPointF(cx + r * 0.7, cy + r * 0.7));
     }
     else if (f == QLatin1String("clearing") || f == QLatin1String("small clearing"))
     {
-        // Circle outline
-        painter->setBrush(Qt::NoBrush);
-        painter->drawEllipse(QPointF(cx, cy), r * 0.8, r * 0.8);
-    }
-    else if (f == QLatin1String("copse") || f == QLatin1String("grove") ||
-             f == QLatin1String("forest corner"))
-    {
-        // Circle with small tree inside
-        painter->setBrush(Qt::NoBrush);
-        painter->drawEllipse(QPointF(cx, cy), r * 0.8, r * 0.8);
+        // 4.4 Прогал: ring of 7 dots
         painter->setBrush(Qt::black);
-        painter->drawEllipse(QPointF(cx, cy - r * 0.15), r * 0.3, r * 0.3);
+        const qreal dr = r * 0.16;
+        for (int k = 0; k < 7; ++k)
+        {
+            const qreal angle = k * 2.0 * M_PI / 7.0;
+            painter->drawEllipse(QPointF(cx + r * 0.68 * std::cos(angle),
+                                         cy + r * 0.68 * std::sin(angle)), dr, dr);
+        }
     }
     else if (f == QLatin1String("linear thicket") || f == QLatin1String("hedge"))
     {
-        // Elongated oval
-        painter->setBrush(Qt::NoBrush);
-        painter->drawEllipse(QPointF(cx, cy), r, r * 0.4);
+        // 4.6 Зеленая изгородь: wavy horizontal line
+        QPainterPath wave;
+        wave.moveTo(cx - r, cy);
+        wave.cubicTo(cx - r * 0.55, cy - r * 0.45,
+                     cx - r * 0.15, cy + r * 0.45,
+                     cx + r * 0.25, cy - r * 0.45);
+        wave.cubicTo(cx + r * 0.65, cy - r * 0.75,
+                     cx + r,        cy,
+                     cx + r,        cy);
+        painter->drawPath(wave);
+    }
+    else if (f == QLatin1String("copse") || f == QLatin1String("grove"))
+    {
+        // 4.8 Околок: triangle outline + 3 dots outside
+        drawTriangle(cx, cy - r * 0.05, r * 0.7, false);
+        painter->setBrush(Qt::black);
+        const qreal dr = r * 0.14;
+        const qreal pr = r * 0.92;
+        painter->drawEllipse(QPointF(cx,                cy - pr),             dr, dr);
+        painter->drawEllipse(QPointF(cx + pr * 0.866,   cy + pr * 0.5),       dr, dr);
+        painter->drawEllipse(QPointF(cx - pr * 0.866,   cy + pr * 0.5),       dr, dr);
+    }
+    else if (f == QLatin1String("distinct tree") || f == QLatin1String("distinctive tree"))
+    {
+        // 4.9 Выделяющееся дерево: simple triangle outline
+        drawTriangle(cx, cy, r * 0.9, false);
     }
     else if (f == QLatin1String("charcoal burning ground"))
     {
-        // Circle outline (historically round shape)
-        painter->setBrush(Qt::NoBrush);
-        painter->drawEllipse(QPointF(cx, cy), r * 0.8, r * 0.8);
-        painter->setPen(QPen(Qt::black, lw));
-        painter->drawLine(QPointF(cx - r * 0.5, cy), QPointF(cx + r * 0.5, cy));
-        painter->drawLine(QPointF(cx, cy - r * 0.5), QPointF(cx, cy + r * 0.5));
+        // 5.19 Земля для сжигания угля: circle with inscribed triangle
+        painter->drawEllipse(QPointF(cx, cy), r * 0.82, r * 0.82);
+        drawTriangle(cx, cy + r * 0.12, r * 0.62, false);
     }
 
-    // ---- Man-made ----
+    // ---- Man-made (IOF 5.x) ----
 
+    else if (f == QLatin1String("earth wall"))
+    {
+        // 1.6 Земляной вал: 5 crosses (+) in a row
+        const qreal arm = r * 0.28;
+        for (int k = 0; k < 5; ++k)
+        {
+            const qreal tx = cx - r + (2.0 * r * k) / 4.0;
+            painter->drawLine(QPointF(tx - arm, cy), QPointF(tx + arm, cy));
+            painter->drawLine(QPointF(tx, cy - arm), QPointF(tx, cy + arm));
+        }
+    }
     else if (f == QLatin1String("building"))
     {
-        // Filled square
+        // 5.11 Здание: filled square
+        painter->setBrush(Qt::black);
         const qreal s = r * 0.72;
         painter->drawRect(QRectF(cx - s, cy - s, 2 * s, 2 * s));
     }
     else if (f == QLatin1String("ruin") || f == QLatin1String("ruined building"))
     {
-        // Dashed square outline
-        painter->setBrush(Qt::NoBrush);
+        // 5.13 Руины: dashed square outline
         painter->setPen(QPen(Qt::black, lw, Qt::DashLine, Qt::FlatCap));
         const qreal s = r * 0.72;
         painter->drawRect(QRectF(cx - s, cy - s, 2 * s, 2 * s));
     }
-    else if (f == QLatin1String("wall") || f == QLatin1String("stone wall"))
+    else if (f == QLatin1String("wall"))
     {
-        // Thick horizontal line
-        painter->setBrush(Qt::NoBrush);
+        // 5.8 Стена: very thick horizontal line
         painter->setPen(QPen(Qt::black, lw * 3.5, Qt::SolidLine, Qt::FlatCap));
         painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
     }
-    else if (f == QLatin1String("fence") || f == QLatin1String("crossing point"))
+    else if (f == QLatin1String("fence"))
     {
-        // Thin line with perpendicular ticks
-        painter->setBrush(Qt::NoBrush);
+        // 5.9 Ограда: horizontal line + ticks pointing upward only
         painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
-        const qreal tick = r * 0.3;
+        const qreal tick = r * 0.45;
         for (int k = 0; k <= 4; ++k)
         {
-            const qreal tx = cx - r + (2.0 * r * k) / 4;
-            painter->drawLine(QPointF(tx, cy - tick), QPointF(tx, cy + tick));
+            const qreal tx = cx - r + (2.0 * r * k) / 4.0;
+            painter->drawLine(QPointF(tx, cy), QPointF(tx, cy - tick));
         }
     }
-    else if (f == QLatin1String("path") || f == QLatin1String("track") ||
-             f == QLatin1String("footpath") || f == QLatin1String("narrow ride"))
+    else if (f == QLatin1String("crossing point"))
     {
-        // Dashed horizontal line
-        painter->setBrush(Qt::NoBrush);
-        painter->setPen(QPen(Qt::black, lw * 1.5, Qt::DashLine, Qt::FlatCap));
-        painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
+        // 5.10 Проход: two vertical bars + gap in middle
+        const qreal bar_h = r * 0.55;
+        const qreal gap   = r * 0.35;
+        painter->drawLine(QPointF(cx - r, cy - bar_h), QPointF(cx - r, cy + bar_h));
+        painter->drawLine(QPointF(cx + r, cy - bar_h), QPointF(cx + r, cy + bar_h));
+        painter->drawLine(QPointF(cx - r, cy), QPointF(cx - gap, cy));
+        painter->drawLine(QPointF(cx + gap, cy), QPointF(cx + r, cy));
+    }
+    else if (f == QLatin1String("path") || f == QLatin1String("track") ||
+             f == QLatin1String("footpath") || f == QLatin1String("narrow ride") ||
+             f == QLatin1String("path / track"))
+    {
+        // 5.2 Тропа: diagonal solid line (~30° from horizontal)
+        painter->drawLine(QPointF(cx - r, cy + r * 0.5), QPointF(cx + r, cy - r * 0.5));
     }
     else if (f == QLatin1String("paved area") || f == QLatin1String("road"))
     {
-        // Filled rectangle (narrower than full cell)
-        const qreal pw = r * 0.5;
-        painter->drawRect(QRectF(cx - r, cy - pw, 2 * r, 2 * pw));
+        // 5.12 Парковка: square outline + diagonal hatching
+        const qreal s = r * 0.72;
+        painter->drawRect(QRectF(cx - s, cy - s, 2 * s, 2 * s));
+        painter->setClipRect(QRectF(cx - s + lw, cy - s + lw, 2 * s - 2 * lw, 2 * s - 2 * lw));
+        for (int k = -3; k <= 3; ++k)
+            painter->drawLine(QPointF(cx + k * s * 0.65 - s, cy - s),
+                              QPointF(cx + k * s * 0.65 + s, cy + s));
+        painter->setClipping(false);
     }
     else if (f == QLatin1String("bridge"))
     {
-        // Horizontal line with short perpendiculars at ends
-        painter->setBrush(Qt::NoBrush);
+        // 5.4 Мост: horizontal line + perpendiculars only at ends
         painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
-        const qreal cap = r * 0.35;
+        const qreal cap = r * 0.4;
         painter->drawLine(QPointF(cx - r, cy - cap), QPointF(cx - r, cy + cap));
         painter->drawLine(QPointF(cx + r, cy - cap), QPointF(cx + r, cy + cap));
     }
     else if (f == QLatin1String("tower"))
     {
-        // T / cross shape
-        painter->setBrush(Qt::NoBrush);
-        painter->drawLine(QPointF(cx, cy - r), QPointF(cx, cy + r));
-        painter->drawLine(QPointF(cx - r * 0.65, cy - r * 0.3),
-                          QPointF(cx + r * 0.65, cy - r * 0.3));
+        // 5.15 Башня/Пилон: T-shape (vertical + horizontal crossbar at top)
+        painter->drawLine(QPointF(cx, cy - r * 0.85), QPointF(cx, cy + r * 0.5));
+        painter->drawLine(QPointF(cx - r * 0.65, cy - r * 0.85),
+                          QPointF(cx + r * 0.65, cy - r * 0.85));
     }
-    else if (f == QLatin1String("monument") || f == QLatin1String("statue") ||
-             f == QLatin1String("cairn") || f == QLatin1String("boundary stone"))
+    else if (f == QLatin1String("high-voltage line pylon"))
     {
-        // Diamond/square on point
-        painter->setBrush(Qt::black);
-        const qreal s = r * 0.55;
-        QPolygonF diamond;
-        diamond << QPointF(cx, cy - s)
-                << QPointF(cx + s, cy)
-                << QPointF(cx, cy + s)
-                << QPointF(cx - s, cy);
-        painter->drawPolygon(diamond);
+        // 5.6 Опора ЛЭП: circle + X + 4 rays at 45°
+        const qreal cr = r * 0.34;
+        painter->drawEllipse(QPointF(cx, cy), cr, cr);
+        const qreal xi = cr * 0.65;
+        painter->drawLine(QPointF(cx - xi, cy - xi), QPointF(cx + xi, cy + xi));
+        painter->drawLine(QPointF(cx + xi, cy - xi), QPointF(cx - xi, cy + xi));
+        for (int k = 0; k < 4; ++k)
+        {
+            const qreal a = k * M_PI / 2.0 + M_PI / 4.0;
+            painter->drawLine(QPointF(cx + cr * std::cos(a), cy + cr * std::sin(a)),
+                              QPointF(cx + r  * std::cos(a), cy + r  * std::sin(a)));
+        }
     }
-    else if (f == QLatin1String("anthill") || f == QLatin1String("termite mound"))
+    else if (f == QLatin1String("boundary stone / cairn"))
     {
-        // Hill shape (like knoll but rounder)
-        QPainterPath path;
-        path.moveTo(cx - r, cy + r * 0.25);
-        path.cubicTo(cx - r, cy - r * 0.9,
-                     cx + r, cy - r * 0.9,
-                     cx + r, cy + r * 0.25);
+        // 5.17 Пограничный камень: circle outline + centre filled dot
+        painter->drawEllipse(QPointF(cx, cy), r * 0.65, r * 0.65);
         painter->setBrush(Qt::black);
-        path.closeSubpath();
-        painter->drawPath(path);
+        painter->drawEllipse(QPointF(cx, cy), r * 0.2, r * 0.2);
+    }
+    else if (f == QLatin1String("monument / statue"))
+    {
+        // 5.20 Монумент: triangle outline
+        drawTriangle(cx, cy + r * 0.1, r * 0.9, false);
+    }
+    else if (f == QLatin1String("fodder rack"))
+    {
+        // 5.18 Кормушка: T with base (inverted T with foot rail)
+        painter->drawLine(QPointF(cx, cy - r * 0.55), QPointF(cx, cy + r * 0.35));
+        painter->drawLine(QPointF(cx - r * 0.65, cy - r * 0.55),
+                          QPointF(cx + r * 0.65, cy - r * 0.55));
+        painter->drawLine(QPointF(cx - r * 0.65, cy + r * 0.35),
+                          QPointF(cx + r * 0.65, cy + r * 0.35));
     }
     else
     {
@@ -1142,12 +1188,12 @@ void CourseOverlay::drawISCDFeatureSymbol(QPainter* painter,
 
 
 // ============================================================
-// ISCD column C — part of feature
+// ISCD column C — part of feature  (IOF 0.1–0.5)
 // ============================================================
 
 void CourseOverlay::drawISCDPartSymbol(QPainter* painter,
                                         const QString& part,
-                                        const QRectF& rect) const
+                                        const QRectF& rect)
 {
     const qreal cx = rect.center().x();
     const qreal cy = rect.center().y();
@@ -1156,36 +1202,93 @@ void CourseOverlay::drawISCDPartSymbol(QPainter* painter,
 
     painter->save();
     painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter->setBrush(Qt::black);
+    painter->setBrush(Qt::NoBrush);
 
     const QString p = part.toLower().trimmed();
 
-    if (p == QLatin1String("upper") || p == QLatin1String("top"))
+    if (p == QLatin1String("upper"))
     {
-        // Horizontal bar near top
-        painter->drawLine(QPointF(cx - r, cy - r * 0.55), QPointF(cx + r, cy - r * 0.55));
+        // 0.3 Upper: two horizontal lines; filled dot at CENTRE of the TOP line
+        const qreal y_top = cy - r * 0.26;
+        const qreal y_bot = cy + r * 0.26;
+        const qreal dot   = r * 0.09;
+        painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::FlatCap));
+        painter->drawLine(QPointF(cx - r * 0.55, y_top), QPointF(cx + r * 0.55, y_top));
+        painter->drawLine(QPointF(cx - r * 0.55, y_bot), QPointF(cx + r * 0.55, y_bot));
+        painter->setBrush(Qt::black);
+        painter->drawEllipse(QPointF(cx, y_top), dot, dot);
+        painter->setBrush(Qt::NoBrush);
     }
-    else if (p == QLatin1String("lower") || p == QLatin1String("bottom"))
+    else if (p == QLatin1String("lower"))
     {
-        // Horizontal bar near bottom
-        painter->drawLine(QPointF(cx - r, cy + r * 0.55), QPointF(cx + r, cy + r * 0.55));
+        // 0.4 Lower: two horizontal lines; filled dot at CENTRE of the BOTTOM line
+        const qreal y_top = cy - r * 0.26;
+        const qreal y_bot = cy + r * 0.26;
+        const qreal dot   = r * 0.09;
+        painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::FlatCap));
+        painter->drawLine(QPointF(cx - r * 0.55, y_top), QPointF(cx + r * 0.55, y_top));
+        painter->drawLine(QPointF(cx - r * 0.55, y_bot), QPointF(cx + r * 0.55, y_bot));
+        painter->setBrush(Qt::black);
+        painter->drawEllipse(QPointF(cx, y_bot), dot, dot);
+        painter->setBrush(Qt::NoBrush);
     }
     else if (p == QLatin1String("middle"))
     {
-        // Horizontal bar at center
-        painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
+        // 0.5 Middle: three vertical lines; filled dot at CENTRE of the middle line
+        const qreal vht = r * 0.55;
+        const qreal sp  = r * 0.32;
+        const qreal dot = r * 0.09;
+        for (int k = -1; k <= 1; ++k)
+            painter->drawLine(QPointF(cx + k * sp, cy - vht),
+                              QPointF(cx + k * sp, cy + vht));
+        painter->setBrush(Qt::black);
+        painter->drawEllipse(QPointF(cx, cy), dot, dot);
+        painter->setBrush(Qt::NoBrush);
     }
     else
     {
-        // Cardinal/intercardinal direction: bold letter
-        QFont f;
-        f.setPixelSize(std::max(7, static_cast<int>(r * 1.5)));
-        f.setBold(true);
-        painter->setFont(f);
-        painter->drawText(rect.adjusted(-rect.width()*0.12, -rect.height()*0.12,
-                                        rect.width()*0.12,  rect.height()*0.12),
-                          Qt::AlignCenter | Qt::TextSingleLine,
-                          part.toUpper());
+        // Cardinal/intercardinal: draw arrow pointing in the named direction
+        qreal dx = 0.0, dy = 0.0;
+        if      (p == QLatin1String("northern") || p == QLatin1String("n"))  { dx =  0; dy = -1; }
+        else if (p == QLatin1String("ne"))                                    { dx =  1; dy = -1; }
+        else if (p == QLatin1String("eastern")  || p == QLatin1String("e"))  { dx =  1; dy =  0; }
+        else if (p == QLatin1String("se"))                                    { dx =  1; dy =  1; }
+        else if (p == QLatin1String("southern") || p == QLatin1String("s"))  { dx =  0; dy =  1; }
+        else if (p == QLatin1String("sw"))                                    { dx = -1; dy =  1; }
+        else if (p == QLatin1String("western")  || p == QLatin1String("w"))  { dx = -1; dy =  0; }
+        else if (p == QLatin1String("nw"))                                    { dx = -1; dy = -1; }
+
+        if (dx != 0.0 || dy != 0.0)
+        {
+            const qreal len = std::sqrt(dx * dx + dy * dy);
+            dx /= len;  dy /= len;
+            const QPointF tip(cx + dx * r * 0.75, cy + dy * r * 0.75);
+            painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter->drawLine(QPointF(cx, cy), tip);
+            // Arrowhead: two lines at ±150° from the direction
+            const qreal head  = r * 0.32;
+            const qreal angle = std::atan2(dy, dx);
+            for (int s = -1; s <= 1; s += 2)
+            {
+                const qreal a = angle + s * (5.0 * M_PI / 6.0);
+                painter->drawLine(tip,
+                    QPointF(tip.x() + head * std::cos(a),
+                            tip.y() + head * std::sin(a)));
+            }
+        }
+        else
+        {
+            // Fallback text for unrecognised values
+            QFont f;
+            f.setPixelSize(std::max(7, static_cast<int>(r * 1.5)));
+            f.setBold(true);
+            painter->setFont(f);
+            painter->setPen(Qt::black);
+            painter->drawText(rect.adjusted(-rect.width()*0.12, -rect.height()*0.12,
+                                            rect.width()*0.12,  rect.height()*0.12),
+                              Qt::AlignCenter | Qt::TextSingleLine,
+                              part.toUpper());
+        }
     }
 
     painter->restore();
@@ -1193,12 +1296,12 @@ void CourseOverlay::drawISCDPartSymbol(QPainter* painter,
 
 
 // ============================================================
-// ISCD column E — appearance / approach
+// ISCD column E — appearance / approach  (IOF 8.x)
 // ============================================================
 
 void CourseOverlay::drawISCDApproachSymbol(QPainter* painter,
                                             const QString& approach,
-                                            const QRectF& rect) const
+                                            const QRectF& rect)
 {
     const qreal cx = rect.center().x();
     const qreal cy = rect.center().y();
@@ -1211,69 +1314,94 @@ void CourseOverlay::drawISCDApproachSymbol(QPainter* painter,
 
     const QString a = approach.toLower().trimmed();
 
+    // Helper: small filled triangle pointing up
+    auto smallTri = [&](qreal cx_t, qreal cy_t, qreal h_t) {
+        const qreal hb = h_t / std::sqrt(3.0);
+        QPolygonF tri;
+        tri << QPointF(cx_t,      cy_t - h_t * 2.0 / 3.0)
+            << QPointF(cx_t + hb, cy_t + h_t / 3.0)
+            << QPointF(cx_t - hb, cy_t + h_t / 3.0);
+        painter->setBrush(Qt::black);
+        painter->drawPolygon(tri);
+        painter->setBrush(Qt::NoBrush);
+    };
+
     if (a == QLatin1String("shallow"))
     {
-        // Shallow open U arc
+        // 8.2 Мелкий: very shallow U arc (opening upward, small height)
         QPainterPath path;
-        path.moveTo(cx - r, cy);
-        path.cubicTo(cx - r, cy + r * 0.5, cx + r, cy + r * 0.5, cx + r, cy);
+        path.moveTo(cx - r, cy + r * 0.1);
+        path.cubicTo(cx - r, cy + r * 0.42,
+                     cx + r, cy + r * 0.42,
+                     cx + r, cy + r * 0.1);
         painter->drawPath(path);
     }
     else if (a == QLatin1String("deep"))
     {
-        // Deep V shape
-        QPolygonF v;
-        v << QPointF(cx - r, cy - r * 0.3)
-          << QPointF(cx,     cy + r * 0.7)
-          << QPointF(cx + r, cy - r * 0.3);
-        painter->drawPolyline(v);
+        // 8.3 Глубокий: deep U curve
+        QPainterPath path;
+        path.moveTo(cx - r, cy - r * 0.42);
+        path.cubicTo(cx - r, cy + r * 0.82,
+                     cx + r, cy + r * 0.82,
+                     cx + r, cy - r * 0.42);
+        painter->drawPath(path);
     }
-    else if (a == QLatin1String("overgrown") || a == QLatin1String("vegetation"))
+    else if (a == QLatin1String("overgrown"))
     {
-        // Small tree dot
-        painter->setBrush(Qt::black);
-        painter->drawEllipse(QPointF(cx, cy - r * 0.3), r * 0.45, r * 0.45);
-        painter->drawLine(QPointF(cx, cy + r * 0.1), QPointF(cx, cy + r * 0.6));
+        // 8.4 Заросший: 2×2 crosshatch grid (#)
+        const qreal hw = r * 0.62;
+        painter->drawLine(QPointF(cx - hw, cy - r * 0.28), QPointF(cx + hw, cy - r * 0.28));
+        painter->drawLine(QPointF(cx - hw, cy + r * 0.28), QPointF(cx + hw, cy + r * 0.28));
+        painter->drawLine(QPointF(cx - r * 0.28, cy - hw), QPointF(cx - r * 0.28, cy + hw));
+        painter->drawLine(QPointF(cx + r * 0.28, cy - hw), QPointF(cx + r * 0.28, cy + hw));
     }
     else if (a == QLatin1String("open"))
     {
-        // Open rectangle
-        painter->drawRect(QRectF(cx - r * 0.8, cy - r * 0.5, 1.6 * r, r));
-    }
-    else if (a == QLatin1String("rocky") || a == QLatin1String("stony"))
-    {
-        // Small dots in a line
+        // 8.5 Открытый: scattered dots (6 points)
         painter->setBrush(Qt::black);
-        const qreal dr = r * 0.2;
-        painter->drawEllipse(QPointF(cx - r * 0.55, cy), dr, dr);
-        painter->drawEllipse(QPointF(cx,             cy), dr, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.55,  cy), dr, dr);
+        const qreal dr = r * 0.16;
+        const QPointF pts[] = {
+            {cx - r * 0.55, cy - r * 0.45},
+            {cx + r * 0.12, cy - r * 0.55},
+            {cx + r * 0.55, cy - r * 0.18},
+            {cx - r * 0.42, cy + r * 0.25},
+            {cx + r * 0.18, cy + r * 0.22},
+            {cx + r * 0.52, cy + r * 0.52}
+        };
+        for (const auto& pt : pts)
+            painter->drawEllipse(pt, dr, dr);
     }
-    else if (a == QLatin1String("marshy") || a == QLatin1String("wet"))
+    else if (a == QLatin1String("rocky"))
     {
-        // Wavy line
-        QPainterPath wave;
-        wave.moveTo(cx - r, cy);
-        wave.cubicTo(cx - r * 0.5, cy - r * 0.4, cx, cy + r * 0.4, cx + r * 0.5, cy - r * 0.4);
-        wave.cubicTo(cx + r * 0.75, cy - r * 0.55, cx + r, cy, cx + r, cy);
-        painter->drawPath(wave);
+        // 8.6 Каменистый: 3 small filled triangles in a row
+        smallTri(cx - r * 0.45, cy + r * 0.12, r * 0.52);
+        smallTri(cx,             cy - r * 0.18, r * 0.52);
+        smallTri(cx + r * 0.45, cy + r * 0.12, r * 0.52);
+    }
+    else if (a == QLatin1String("marshy"))
+    {
+        // 8.7 Заболоченный: 3 horizontal lines (≡)
+        for (int row = -1; row <= 1; ++row)
+            painter->drawLine(QPointF(cx - r * 0.82, cy + row * r * 0.38),
+                              QPointF(cx + r * 0.82, cy + row * r * 0.38));
     }
     else if (a == QLatin1String("sandy"))
     {
-        // Dotted pattern (3×3 dots)
+        // 8.8 Песчаный: 4×3 grid of small dots
         painter->setBrush(Qt::black);
-        const qreal dr = r * 0.15;
-        const qreal sp = r * 0.45;
+        const qreal dr  = r * 0.10;
+        const qreal spx = r * 0.48;
+        const qreal spy = r * 0.42;
         for (int row = -1; row <= 1; ++row)
-            for (int col = -1; col <= 1; ++col)
-                painter->drawEllipse(QPointF(cx + col * sp, cy + row * sp), dr, dr);
+            for (int col = 0; col < 4; ++col)
+                painter->drawEllipse(QPointF(cx + (col - 1.5) * spx,
+                                             cy + row * spy), dr, dr);
     }
-    else if (a == QLatin1String("ruined") || a == QLatin1String("deteriorated"))
+    else if (a == QLatin1String("ruined"))
     {
-        // Dashed square
-        painter->setPen(QPen(Qt::black, lw, Qt::DashLine, Qt::FlatCap));
-        const qreal s = r * 0.72;
-        painter->drawRect(QRectF(cx - s, cy - s, 2 * s, 2 * s));
+        // 8.11 Разрушенный: Г-shaped folded line (horizontal then drops down)
+        painter->drawLine(QPointF(cx - r * 0.68, cy - r * 0.3), QPointF(cx + r * 0.52, cy - r * 0.3));
+        painter->drawLine(QPointF(cx + r * 0.52, cy - r * 0.3), QPointF(cx + r * 0.52, cy + r * 0.62));
     }
     else
     {
@@ -1293,96 +1421,169 @@ void CourseOverlay::drawISCDApproachSymbol(QPainter* painter,
 
 
 // ============================================================
-// ISCD column G — location detail
+// ISCD column G — location detail  (IOF 12.x)
 // ============================================================
 
 void CourseOverlay::drawISCDLocationSymbol(QPainter* painter,
                                             const QString& location,
-                                            const QRectF& rect) const
+                                            const QRectF& rect)
 {
     const qreal cx = rect.center().x();
     const qreal cy = rect.center().y();
     const qreal r  = std::min(rect.width(), rect.height()) * 0.44;
     const qreal lw = std::max(1.0, r * 0.16);
-    const qreal dr = r * 0.22;
+    const qreal cr = r * 0.34;  // radius of feature-outline circle
+    const qreal dr = r * 0.17;  // radius of location dot
 
     painter->save();
     painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-    painter->setBrush(Qt::black);
+    painter->setBrush(Qt::NoBrush);
 
     const QString loc = location.toLower().trimmed();
 
-    if (loc == QLatin1String("top") || loc == QLatin1String("summit"))
-    {
-        // Filled dot at upper centre
-        painter->drawEllipse(QPointF(cx, cy - r * 0.45), dr, dr);
-    }
-    else if (loc == QLatin1String("foot") || loc == QLatin1String("base"))
-    {
-        // Filled dot at lower centre
-        painter->drawEllipse(QPointF(cx, cy + r * 0.45), dr, dr);
-    }
-    else if (loc == QLatin1String("edge") || loc == QLatin1String("margin"))
-    {
-        // Dot at right edge
-        painter->drawEllipse(QPointF(cx + r * 0.55, cy), dr, dr);
-    }
-    else if (loc == QLatin1String("corner"))
-    {
-        // Right-angle at top-right
+    // Draw circle (feature outline) + filled dot at offset (dx,dy)*dist from centre
+    auto circleWithDot = [&](qreal dx, qreal dy, qreal dist) {
         painter->setBrush(Qt::NoBrush);
-        painter->drawLine(QPointF(cx + r * 0.6, cy - r * 0.6),
-                          QPointF(cx + r * 0.6, cy + r * 0.1));
-        painter->drawLine(QPointF(cx + r * 0.6, cy + r * 0.1),
-                          QPointF(cx - r * 0.1, cy + r * 0.1));
-    }
-    else if (loc == QLatin1String("tip") || loc == QLatin1String("end"))
-    {
-        // Dot at right
-        painter->drawEllipse(QPointF(cx + r * 0.55, cy), dr, dr);
+        painter->drawEllipse(QPointF(cx, cy), cr, cr);
+        painter->setBrush(Qt::black);
+        painter->drawEllipse(QPointF(cx + dx * dist, cy + dy * dist), dr, dr);
         painter->setBrush(Qt::NoBrush);
-        painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r * 0.33, cy));
-    }
-    else if (loc == QLatin1String("junction") || loc == QLatin1String("intersection"))
+    };
+
+    // Parse "<dir> <type>" where dir is compass (n/ne/e/…) and type is foot/edge/tip/end
+    auto parseDir = [](const QString& s, qreal& dx, qreal& dy) -> bool {
+        dx = dy = 0;
+        if      (s == QLatin1String("n"))  { dx =  0; dy = -1; }
+        else if (s == QLatin1String("ne")) { dx =  1; dy = -1; }
+        else if (s == QLatin1String("e"))  { dx =  1; dy =  0; }
+        else if (s == QLatin1String("se")) { dx =  1; dy =  1; }
+        else if (s == QLatin1String("s"))  { dx =  0; dy =  1; }
+        else if (s == QLatin1String("sw")) { dx = -1; dy =  1; }
+        else if (s == QLatin1String("w"))  { dx = -1; dy =  0; }
+        else if (s == QLatin1String("nw")) { dx = -1; dy = -1; }
+        else                               { return false; }
+        const qreal len = std::sqrt(dx * dx + dy * dy);
+        if (len > 0.001) { dx /= len; dy /= len; }
+        return true;
+    };
+
+    if (loc == QLatin1String("top"))
     {
-        // Cross (+)
-        painter->setBrush(Qt::NoBrush);
+        // 12.10 Верх: Π — two verticals + crossbar at top
+        const qreal vx = r * 0.44;
+        painter->drawLine(QPointF(cx - vx, cy - r * 0.55), QPointF(cx - vx, cy + r * 0.55));
+        painter->drawLine(QPointF(cx + vx, cy - r * 0.55), QPointF(cx + vx, cy + r * 0.55));
+        painter->drawLine(QPointF(cx - vx, cy - r * 0.55), QPointF(cx + vx, cy - r * 0.55));
+    }
+    else if (loc == QLatin1String("upper part"))
+    {
+        // 12.8 Верхняя часть: |‾| — verticals + crossbar in upper third; bars extend above
+        const qreal vx = r * 0.44;
+        painter->drawLine(QPointF(cx - vx, cy - r * 0.55), QPointF(cx - vx, cy + r * 0.55));
+        painter->drawLine(QPointF(cx + vx, cy - r * 0.55), QPointF(cx + vx, cy + r * 0.55));
+        painter->drawLine(QPointF(cx - vx, cy - r * 0.15), QPointF(cx + vx, cy - r * 0.15));
+    }
+    else if (loc == QLatin1String("lower part"))
+    {
+        // 12.9 Нижняя часть: |_| — verticals + crossbar in lower third
+        const qreal vx = r * 0.44;
+        painter->drawLine(QPointF(cx - vx, cy - r * 0.55), QPointF(cx - vx, cy + r * 0.55));
+        painter->drawLine(QPointF(cx + vx, cy - r * 0.55), QPointF(cx + vx, cy + r * 0.55));
+        painter->drawLine(QPointF(cx - vx, cy + r * 0.15), QPointF(cx + vx, cy + r * 0.15));
+    }
+    else if (loc == QLatin1String("foot"))
+    {
+        // 12.11 Подножие: ⌊ L-shape (horizontal + vertical down on left end)
+        painter->drawLine(QPointF(cx - r * 0.6, cy - r * 0.25),
+                          QPointF(cx + r * 0.6, cy - r * 0.25));
+        painter->drawLine(QPointF(cx - r * 0.6, cy - r * 0.25),
+                          QPointF(cx - r * 0.6, cy + r * 0.55));
+    }
+    else if (loc == QLatin1String("side"))
+    {
+        // Generic side: circle + dot at eastern edge
+        circleWithDot(1.0, 0.0, cr);
+    }
+    else if (loc == QLatin1String("corner (inside)"))
+    {
+        // 12.4 Угол внутри: > chevron pointing right
+        painter->drawLine(QPointF(cx - r * 0.5, cy - r * 0.6), QPointF(cx + r * 0.55, cy));
+        painter->drawLine(QPointF(cx + r * 0.55, cy),           QPointF(cx - r * 0.5, cy + r * 0.6));
+    }
+    else if (loc == QLatin1String("corner (outside)"))
+    {
+        // 12.5 Угол снаружи: ∨ V pointing down
+        painter->drawLine(QPointF(cx - r * 0.6, cy - r * 0.4), QPointF(cx, cy + r * 0.55));
+        painter->drawLine(QPointF(cx, cy + r * 0.55),           QPointF(cx + r * 0.6, cy - r * 0.4));
+    }
+    else if (loc == QLatin1String("junction"))
+    {
+        // + cross
         painter->drawLine(QPointF(cx - r, cy), QPointF(cx + r, cy));
         painter->drawLine(QPointF(cx, cy - r), QPointF(cx, cy + r));
     }
-    else if (loc == QLatin1String("between") || loc == QLatin1String("in"))
+    else if (loc == QLatin1String("between"))
     {
-        // Two dots with space between
-        painter->drawEllipse(QPointF(cx - r * 0.5, cy), dr, dr);
-        painter->drawEllipse(QPointF(cx + r * 0.5, cy), dr, dr);
+        // 12.14 Между: —•— dot flanked by horizontal bars
+        painter->setBrush(Qt::black);
+        painter->drawEllipse(QPointF(cx, cy), dr, dr);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawLine(QPointF(cx - r,        cy), QPointF(cx - dr * 1.6, cy));
+        painter->drawLine(QPointF(cx + dr * 1.6, cy), QPointF(cx + r,        cy));
     }
-    else if (loc == QLatin1String("north side") || loc == QLatin1String("n side"))
+    else
     {
-        painter->drawEllipse(QPointF(cx, cy - r * 0.5), dr, dr);
-    }
-    else if (loc == QLatin1String("south side") || loc == QLatin1String("s side"))
-    {
-        painter->drawEllipse(QPointF(cx, cy + r * 0.5), dr, dr);
-    }
-    else if (loc == QLatin1String("east side") || loc == QLatin1String("e side"))
-    {
-        painter->drawEllipse(QPointF(cx + r * 0.5, cy), dr, dr);
-    }
-    else if (loc == QLatin1String("west side") || loc == QLatin1String("w side"))
-    {
-        painter->drawEllipse(QPointF(cx - r * 0.5, cy), dr, dr);
-    }
-    else if (!location.isEmpty())
-    {
-        // Fallback text
-        QFont f;
-        f.setPixelSize(std::max(6, static_cast<int>(r * 1.2)));
-        painter->setFont(f);
-        painter->setPen(Qt::black);
-        painter->drawText(rect.adjusted(-rect.width()*0.12, -rect.height()*0.12,
-                                        rect.width()*0.12,  rect.height()*0.12),
-                          Qt::AlignCenter | Qt::TextSingleLine,
-                          location.left(6));
+        // Parse directional variants: "<dir> foot|edge|tip|end"
+        const int spaceIdx = loc.indexOf(QLatin1Char(' '));
+        const QString dirStr  = spaceIdx >= 0 ? loc.left(spaceIdx) : loc;
+        const QString typeStr = spaceIdx >= 0 ? loc.mid(spaceIdx + 1)
+                                              : QLatin1String("foot");
+
+        qreal dx = 0, dy = 0;
+        if (parseDir(dirStr, dx, dy))
+        {
+            if (typeStr == QLatin1String("foot"))
+            {
+                // 12.12: circle + dot beyond edge in direction
+                circleWithDot(dx, dy, cr + dr * 2.4);
+            }
+            else if (typeStr == QLatin1String("edge"))
+            {
+                // 12.1/12.2: circle + dot on the edge
+                circleWithDot(dx, dy, cr);
+            }
+            else if (typeStr == QLatin1String("tip") || typeStr == QLatin1String("end"))
+            {
+                // 12.6/12.7: directional arrow (no circle)
+                const QPointF tip(cx + dx * r * 0.75, cy + dy * r * 0.75);
+                painter->drawLine(QPointF(cx, cy), tip);
+                const qreal head  = r * 0.3;
+                const qreal angle = std::atan2(dy, dx);
+                for (int s = -1; s <= 1; s += 2)
+                {
+                    const qreal a = angle + s * (5.0 * M_PI / 6.0);
+                    painter->drawLine(tip,
+                        QPointF(tip.x() + head * std::cos(a),
+                                tip.y() + head * std::sin(a)));
+                }
+            }
+            else
+            {
+                circleWithDot(dx, dy, cr + dr * 2.4);
+            }
+        }
+        else if (!location.isEmpty())
+        {
+            // Fallback text
+            QFont f;
+            f.setPixelSize(std::max(6, static_cast<int>(r * 1.2)));
+            painter->setFont(f);
+            painter->setPen(Qt::black);
+            painter->drawText(rect.adjusted(-rect.width()*0.12, -rect.height()*0.12,
+                                            rect.width()*0.12,  rect.height()*0.12),
+                              Qt::AlignCenter | Qt::TextSingleLine,
+                              location.left(6));
+        }
     }
 
     painter->restore();

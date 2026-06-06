@@ -31,6 +31,7 @@
 #include "fileformats/file_format_registry.h"
 #include "fileformats/file_import_export.h"
 #include "gui/course/course_panel.h"
+#include "gui/course/iscd_symbol_browser.h"
 #include "gui/map/map_editor.h"
 #include "gui/map/map_editor_p.h"
 #include "gui/map/map_widget.h"
@@ -69,6 +70,12 @@ CourseFeature::CourseFeature(MapEditorController& controller)
     export_iof_act->setMenuRole(QAction::NoRole);
     connect(export_iof_act, &QAction::triggered,
             this, &CourseFeature::exportIofFull);
+
+    // "Symbol Reference" browser (development aid)
+    symbol_browser_act = new QAction(tr("ISCD Symbol &Reference…"), this);
+    symbol_browser_act->setMenuRole(QAction::NoRole);
+    connect(symbol_browser_act, &QAction::triggered,
+            this, &CourseFeature::openSymbolBrowser);
 }
 
 
@@ -176,6 +183,14 @@ void CourseFeature::exportIofFull()
         QMessageBox::information(controller.getWindow(),
                                  tr("Export IOF"), msg);
     }
+}
+
+
+void CourseFeature::openSymbolBrowser()
+{
+    auto* dlg = new ISCDSymbolBrowser(controller.getWindow());
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->show();
 }
 
 

@@ -1292,6 +1292,7 @@ void MapEditorController::createMenuAndToolbars()
 		courses_menu->addAction(course_feature->placeControlAction());
 		courses_menu->addSeparator();
 		courses_menu->addAction(course_feature->exportIofFullAction());
+		courses_menu->addAction(course_feature->symbolBrowserAction());
 	}
 
 	// Symbols menu

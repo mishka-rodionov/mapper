@@ -90,6 +90,12 @@ public:
     bool mouseMoveEvent(QMouseEvent* event);
     bool mouseReleaseEvent(QMouseEvent* event);
 
+    // ISCD column-specific symbol renderers (static: no instance state required)
+    static void drawISCDFeatureSymbol(QPainter* painter, const QString& feature, const QRectF& r);
+    static void drawISCDPartSymbol(QPainter* painter, const QString& part, const QRectF& r);
+    static void drawISCDApproachSymbol(QPainter* painter, const QString& approach, const QRectF& r);
+    static void drawISCDLocationSymbol(QPainter* painter, const QString& location, const QRectF& r);
+
 private slots:
     void onDatabaseChanged();
 
@@ -120,12 +126,6 @@ private:
 
     /** Returns the total course distance in meters (0 if < 2 resolved controls). */
     qreal computeCourseDistanceM(const Course& course) const;
-
-    // ISCD column-specific symbol renderers
-    void drawISCDFeatureSymbol(QPainter* painter, const QString& feature, const QRectF& r) const;
-    void drawISCDPartSymbol(QPainter* painter, const QString& part, const QRectF& r) const;
-    void drawISCDApproachSymbol(QPainter* painter, const QString& approach, const QRectF& r) const;
-    void drawISCDLocationSymbol(QPainter* painter, const QString& location, const QRectF& r) const;
 
     // --- Coordinate conversion ---
     /** Converts a MapCoord (1/1000 mm) to viewport pixel coordinates. */
