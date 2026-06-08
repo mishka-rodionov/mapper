@@ -181,6 +181,7 @@ set(Mapper_Common_SRCS
   gui/course/course_feature.cpp
   gui/course/course_panel.cpp
   gui/course/iscd_symbol_browser.cpp
+  gui/course/iscd_symbol_editor.cpp
 
   gui/map/map_find_feature.cpp
   gui/map/map_information_dialog.cpp

@@ -39,6 +39,11 @@
 #include <QString>
 #include <QVector>
 
+#include <QCoreApplication>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+
 #include "core/map.h"
 #include "course/course.h"
 #include "course/course_control.h"
@@ -49,6 +54,52 @@
 
 
 namespace OpenOrienteering {
+
+// ── Custom symbol paths (edited in ISCDSymbolEditor) ─────────────────────────
+
+QJsonObject CourseOverlay::s_custom;
+static bool s_custom_loaded = false;
+
+static void ensureCustomPathsLoaded()
+{
+    if (s_custom_loaded) return;
+    s_custom_loaded = true;
+    const QString path = QCoreApplication::applicationDirPath()
+                         + QLatin1String("/iscd_symbols.json");
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) return;
+    QJsonParseError err;
+    const auto doc = QJsonDocument::fromJson(f.readAll(), &err);
+    if (err.error == QJsonParseError::NoError && doc.isObject())
+        CourseOverlay::setCustomSymbolPaths(doc.object());
+}
+
+void CourseOverlay::loadCustomSymbolPaths(const QString& filePath)
+{
+    QFile f(filePath);
+    if (!f.open(QIODevice::ReadOnly)) return;
+    QJsonParseError err;
+    const auto doc = QJsonDocument::fromJson(f.readAll(), &err);
+    if (err.error == QJsonParseError::NoError && doc.isObject())
+        s_custom = doc.object();
+    s_custom_loaded = true;
+}
+
+void CourseOverlay::saveCustomSymbolPaths(const QString& filePath)
+{
+    QFile f(filePath);
+    if (!f.open(QIODevice::WriteOnly)) return;
+    f.write(QJsonDocument(s_custom).toJson());
+}
+
+QJsonObject CourseOverlay::customSymbolPaths() { return s_custom; }
+void CourseOverlay::setCustomSymbolPaths(const QJsonObject& d)
+{
+    s_custom = d;
+    s_custom_loaded = true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 namespace {
 
@@ -65,6 +116,84 @@ constexpr qreal number_offset_mm    = 3.5;
 
 // IOF Control Description cell size (mm on paper), per ISCD 2004 standard.
 constexpr qreal cell_mm = 7.0;
+
+// ── Custom-path rendering helpers ────────────────────────────────────────────
+
+// Compute a polyline approximating the arc through 3 points (screen coords).
+QPolygonF arcPolyline(QPointF p1, QPointF pmid, QPointF p3)
+{
+    const double ax = p1.x(),   ay = p1.y();
+    const double bx = pmid.x(), by = pmid.y();
+    const double cx = p3.x(),   cy = p3.y();
+    const double D  = 2.0*(ax*(by-cy)+bx*(cy-ay)+cx*(ay-by));
+    if (std::abs(D) < 1e-4) { QPolygonF l; l << p1 << p3; return l; }
+    const double ux = ((ax*ax+ay*ay)*(by-cy)+(bx*bx+by*by)*(cy-ay)+(cx*cx+cy*cy)*(ay-by))/D;
+    const double uy = ((ax*ax+ay*ay)*(cx-bx)+(bx*bx+by*by)*(ax-cx)+(cx*cx+cy*cy)*(bx-ax))/D;
+    const double R  = std::hypot(ax-ux, ay-uy);
+    auto ang = [&](double px, double py){ return std::atan2(py-uy, px-ux); };
+    const double a1 = ang(ax,ay), a2 = ang(bx,by), a3 = ang(cx,cy);
+    double sweep = a3-a1; if (sweep <= 0) sweep += 2*M_PI;
+    double a2r = a2-a1;   if (a2r <= 0)  a2r += 2*M_PI;
+    if (a2r > sweep) sweep -= 2*M_PI;
+    const int n = std::max(12, static_cast<int>(std::abs(sweep)*R/3.0));
+    QPolygonF poly;
+    for (int i = 0; i <= n; ++i)
+        poly << QPointF(ux + R*std::cos(a1 + sweep*i/n), uy + R*std::sin(a1 + sweep*i/n));
+    return poly;
+}
+
+// Try to render symbol from custom JSON paths; returns true if drawn.
+bool tryDrawCustomPath(QPainter* painter, const QString& key, const QRectF& rect, qreal lw)
+{
+    ensureCustomPathsLoaded();
+    const QJsonObject all = CourseOverlay::customSymbolPaths();
+    if (!all.contains(key)) return false;
+    const QJsonArray strokes = all[key].toArray();
+    if (strokes.isEmpty()) return false;
+
+    const double cx    = rect.center().x();
+    const double cy    = rect.center().y();
+    const double scale = std::min(rect.width(), rect.height()) * 0.5;
+    auto u2p = [&](const QJsonArray& pt) -> QPointF {
+        return { cx + pt[0].toDouble()*scale, cy + pt[1].toDouble()*scale };
+    };
+
+    painter->save();
+    const QPen outlinePen { Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin };
+    painter->setPen(outlinePen);
+    painter->setBrush(Qt::NoBrush);
+    for (const QJsonValue& sv : strokes) {
+        const QJsonObject s   = sv.toObject();
+        const QJsonArray  pts = s[QLatin1String("p")].toArray();
+        const QString     t   = s[QLatin1String("t")].toString();
+        if (t == QLatin1String("L") && pts.size() >= 2) {
+            painter->drawLine(u2p(pts[0].toArray()), u2p(pts[1].toArray()));
+        } else if (t == QLatin1String("A") && pts.size() >= 3) {
+            painter->drawPolyline(arcPolyline(u2p(pts[0].toArray()),
+                                              u2p(pts[1].toArray()),
+                                              u2p(pts[2].toArray())));
+        } else if (t == QLatin1String("O") && pts.size() >= 2) {
+            painter->drawEllipse(QRectF(u2p(pts[0].toArray()), u2p(pts[1].toArray())).normalized());
+        } else if (t == QLatin1String("C") && pts.size() >= 2) {
+            const QPointF c = u2p(pts[0].toArray());
+            const QPointF e = u2p(pts[1].toArray());
+            const double  r = std::hypot(e.x()-c.x(), e.y()-c.y());
+            painter->drawEllipse(c, r, r);
+        } else if (t == QLatin1String("R") && pts.size() >= 2) {
+            painter->drawRect(QRectF(u2p(pts[0].toArray()), u2p(pts[1].toArray())).normalized());
+        } else if (t == QLatin1String("P") && pts.size() >= 1) {
+            const QPointF c = u2p(pts[0].toArray());
+            const double  r = s[QLatin1String("d")].toDouble(0.1) * scale * 0.5;
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(Qt::black);
+            painter->drawEllipse(c, r, r);
+            painter->setPen(outlinePen);
+            painter->setBrush(Qt::NoBrush);
+        }
+    }
+    painter->restore();
+    return true;
+}
 
 }  // anonymous namespace
 
@@ -706,6 +835,8 @@ void CourseOverlay::drawISCDFeatureSymbol(QPainter* painter,
     const qreal r  = std::min(w, h) * 0.44;
     const qreal lw = std::max(1.0, r * 0.18);
 
+    if (tryDrawCustomPath(painter, feature.toLower().trimmed(), rect, lw)) return;
+
     painter->save();
     painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter->setBrush(Qt::NoBrush);
@@ -728,12 +859,15 @@ void CourseOverlay::drawISCDFeatureSymbol(QPainter* painter,
 
     if (f == QLatin1String("re-entrant") || f == QLatin1String("re entrant"))
     {
-        // 1.3 Лощина: ∩ arch open at bottom
+        // 1.3 Лощина: ∩ straight legs + semicircular arch open at bottom
+        const qreal hw  = r * 0.55;
+        const qreal mid = cy - r * 0.30;
+        const qreal bot = cy + r * 0.85;
         QPainterPath path;
-        path.moveTo(cx - r, cy + r * 0.2);
-        path.cubicTo(cx - r, cy - r * 0.9,
-                     cx + r, cy - r * 0.9,
-                     cx + r, cy + r * 0.2);
+        path.moveTo(cx - hw, bot);
+        path.lineTo(cx - hw, mid);
+        path.arcTo(QRectF(cx - hw, mid - hw, hw * 2.0, hw * 2.0), 180, -180);
+        path.lineTo(cx + hw, bot);
         painter->drawPath(path);
     }
     else if (f == QLatin1String("spur"))
@@ -1200,6 +1334,8 @@ void CourseOverlay::drawISCDPartSymbol(QPainter* painter,
     const qreal r  = std::min(rect.width(), rect.height()) * 0.44;
     const qreal lw = std::max(1.0, r * 0.16);
 
+    if (tryDrawCustomPath(painter, part.toLower().trimmed(), rect, lw)) return;
+
     painter->save();
     painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     painter->setBrush(Qt::NoBrush);
@@ -1307,6 +1443,8 @@ void CourseOverlay::drawISCDApproachSymbol(QPainter* painter,
     const qreal cy = rect.center().y();
     const qreal r  = std::min(rect.width(), rect.height()) * 0.44;
     const qreal lw = std::max(1.0, r * 0.16);
+
+    if (tryDrawCustomPath(painter, approach.toLower().trimmed(), rect, lw)) return;
 
     painter->save();
     painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -1434,6 +1572,8 @@ void CourseOverlay::drawISCDLocationSymbol(QPainter* painter,
     const qreal lw = std::max(1.0, r * 0.16);
     const qreal cr = r * 0.34;  // radius of feature-outline circle
     const qreal dr = r * 0.17;  // radius of location dot
+
+    if (tryDrawCustomPath(painter, location.toLower().trimmed(), rect, lw)) return;
 
     painter->save();
     painter->setPen(QPen(Qt::black, lw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));

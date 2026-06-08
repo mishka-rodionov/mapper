@@ -21,14 +21,17 @@
 
 #include <QFont>
 #include <QFontMetrics>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPainter>
+#include <QPushButton>
 #include <QRectF>
 #include <QScrollArea>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include "course/course_overlay.h"
+#include "gui/course/iscd_symbol_editor.h"
 
 
 namespace OpenOrienteering {
@@ -287,16 +290,30 @@ ISCDSymbolBrowser::ISCDSymbolBrowser(QWidget* parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("ISCD Symbol Reference"));
-    resize(420, 600);
+    resize(420, 620);
 
-    auto* canvas     = new SymbolCanvas;
-    auto* scroll     = new QScrollArea;
+    auto* canvas = new SymbolCanvas;
+    auto* scroll = new QScrollArea;
     scroll->setWidget(canvas);
     scroll->setWidgetResizable(false);
 
+    auto* editBtn = new QPushButton(tr("Редактор символов…"), this);
+    connect(editBtn, &QPushButton::clicked, this, [this, canvas]{
+        auto* ed = new ISCDSymbolEditor(this);
+        ed->setAttribute(Qt::WA_DeleteOnClose);
+        connect(ed, &QDialog::finished, canvas, [canvas]{ canvas->update(); });
+        ed->show();
+    });
+
+    auto* btnBar = new QHBoxLayout;
+    btnBar->addStretch();
+    btnBar->addWidget(editBtn);
+    btnBar->setContentsMargins(4, 4, 4, 4);
+
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(scroll);
+    layout->addWidget(scroll, 1);
+    layout->addLayout(btnBar);
 }
 
 }  // namespace OpenOrienteering

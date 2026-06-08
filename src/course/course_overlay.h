@@ -20,6 +20,7 @@
 #ifndef OPENORIENTEERING_COURSE_OVERLAY_H
 #define OPENORIENTEERING_COURSE_OVERLAY_H
 
+#include <QJsonObject>
 #include <QObject>
 #include <QPointF>
 #include <QPolygonF>
@@ -96,6 +97,12 @@ public:
     static void drawISCDApproachSymbol(QPainter* painter, const QString& approach, const QRectF& r);
     static void drawISCDLocationSymbol(QPainter* painter, const QString& location, const QRectF& r);
 
+    // Custom symbol paths loaded from / saved to JSON (edited in ISCDSymbolEditor)
+    static void        loadCustomSymbolPaths(const QString& filePath);
+    static void        saveCustomSymbolPaths(const QString& filePath);
+    static QJsonObject customSymbolPaths();
+    static void        setCustomSymbolPaths(const QJsonObject& data);
+
 private slots:
     void onDatabaseChanged();
 
@@ -136,6 +143,8 @@ private:
      * e.g. a 5mm IOF circle at 2× zoom = 2× more pixels.
      */
     qreal mmToViewportPx(qreal mm) const;
+
+    static QJsonObject s_custom;
 
     MapWidget* widget;
     const CourseDatabase& db;
