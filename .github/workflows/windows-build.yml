@@ -33,7 +33,13 @@ jobs:
             mingw-w64-x86_64-doxygen
 
       - name: Configure
-        run: cmake -G Ninja -S "${GITHUB_WORKSPACE}" -B build -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -G Ninja -S "${GITHUB_WORKSPACE}" -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMapper_PACKAGE_ASSISTANT=OFF \
+            -DMapper_PACKAGE_QT=OFF \
+            -DMapper_PACKAGE_PROJ=OFF \
+            -DMapper_PACKAGE_GDAL=OFF
 
       - name: Build
         run: cmake --build build
