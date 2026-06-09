@@ -1,0 +1,80 @@
+name: Windows build
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2 (MinGW64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-qt5
+            mingw-w64-x86_64-proj
+            mingw-w64-x86_64-gdal
+            mingw-w64-x86_64-polyclipping
+
+      - name: Configure
+        run: cmake -G Ninja -S "${GITHUB_WORKSPACE}" -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package portable build
+        run: |
+          set -e
+          DIST="dist/Mapper"
+          mkdir -p "$DIST"
+          cp build/src/Mapper.exe "$DIST/"
+
+          # Let Qt collect its own plugins/DLLs
+          windeployqt --release "$DIST/Mapper.exe"
+
+          # Bundle the MinGW runtime DLLs (Qt, PROJ, GDAL, libgcc, etc.)
+          # that the executable and its plugins depend on.
+          collected=1
+          while [ "$collected" -ne 0 ]; do
+            collected=0
+            for f in "$DIST"/*.exe "$DIST"/*.dll; do
+              [ -e "$f" ] || continue
+              for dll in $(ldd "$f" 2>/dev/null | awk '{print $3}' | grep -i '/mingw64/'); do
+                base=$(basename "$dll")
+                if [ ! -e "$DIST/$base" ]; then
+                  cp "$dll" "$DIST/"
+                  collected=1
+                fi
+              done
+            done
+          done
+
+          # PROJ and GDAL need their data directories at runtime.
+          mkdir -p "$DIST/share"
+          cp -r /mingw64/share/proj "$DIST/share/" 2>/dev/null || true
+          cp -r /mingw64/share/gdal "$DIST/share/" 2>/dev/null || true
+
+          cd dist && 7z a -tzip "../Mapper-windows-x64.zip" Mapper
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mapper-windows-x64
+          path: Mapper-windows-x64.zip
+          retention-days: 30
