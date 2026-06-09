@@ -51,15 +51,23 @@ jobs:
           mkdir -p "$DIST"
           cp build/src/Mapper.exe "$DIST/"
 
-          # Let Qt collect its own plugins/DLLs
-          windeployqt --release "$DIST/Mapper.exe"
+          # Qt plugins are not auto-collected (no windeployqt in MSYS2);
+          # copy the ones Mapper needs to find a platform and load images/SQL.
+          QT_PLUGINS="/mingw64/share/qt5/plugins"
+          for sub in platforms imageformats iconengines styles platformthemes printsupport sqldrivers tls generic; do
+            if [ -d "$QT_PLUGINS/$sub" ]; then
+              mkdir -p "$DIST/$sub"
+              cp -r "$QT_PLUGINS/$sub"/*.dll "$DIST/$sub/" 2>/dev/null || true
+            fi
+          done
+          printf '[Paths]\nPlugins = .\n' > "$DIST/qt.conf"
 
           # Bundle the MinGW runtime DLLs (Qt, PROJ, GDAL, libgcc, etc.)
           # that the executable and its plugins depend on.
           collected=1
           while [ "$collected" -ne 0 ]; do
             collected=0
-            for f in "$DIST"/*.exe "$DIST"/*.dll; do
+            for f in $(find "$DIST" -name '*.exe' -o -name '*.dll'); do
               [ -e "$f" ] || continue
               for dll in $(ldd "$f" 2>/dev/null | awk '{print $3}' | grep -i '/mingw64/'); do
                 base=$(basename "$dll")
