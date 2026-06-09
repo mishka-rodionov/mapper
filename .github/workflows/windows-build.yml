@@ -30,6 +30,7 @@ jobs:
             mingw-w64-x86_64-qt5
             mingw-w64-x86_64-proj
             mingw-w64-x86_64-gdal
+            mingw-w64-x86_64-doxygen
 
       - name: Configure
         run: cmake -G Ninja -S "${GITHUB_WORKSPACE}" -B build -DCMAKE_BUILD_TYPE=Release
