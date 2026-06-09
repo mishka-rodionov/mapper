@@ -117,6 +117,23 @@ constexpr qreal number_offset_mm    = 3.5;
 // IOF Control Description cell size (mm on paper), per ISCD 2004 standard.
 constexpr qreal cell_mm = 7.0;
 
+qreal boundedDescriptionScale(double scale)
+{
+    if (!(scale > 0.0))
+        return 1.0;
+    if (scale < 0.25)
+        return 0.25;
+    if (scale > 2.0)
+        return 2.0;
+    return static_cast<qreal>(scale);
+}
+
+QRectF legendResizeHandleRect(const QRectF& bounds)
+{
+    const qreal size = 12.0;
+    return QRectF(bounds.right() - size, bounds.bottom() - size, size, size);
+}
+
 // ── Custom-path rendering helpers ────────────────────────────────────────────
 
 // Compute a polyline approximating the arc through 3 points (screen coords).
@@ -240,10 +257,9 @@ void CourseOverlay::paint(QPainter* painter)
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
 
+    paintAllControls(painter);
     if (visible_course)
         paintCourse(painter, *visible_course);
-    else
-        paintAllControls(painter);
 
     painter->restore();
 
@@ -443,7 +459,7 @@ qreal CourseOverlay::mmToViewportPx(qreal mm) const
 }
 
 
-// --- Mouse event handlers for legend dragging ---
+// --- Mouse event handlers for legend dragging/resizing ---
 
 bool CourseOverlay::mousePressEvent(QMouseEvent* event)
 {
@@ -453,6 +469,16 @@ bool CourseOverlay::mousePressEvent(QMouseEvent* event)
         return false;
     if (legend_bounds_cache.isNull())
         return false;
+
+    if (legend_resize_handle_cache.contains(event->pos()))
+    {
+        legend_resizing = true;
+        legend_resize_start_bounds = legend_bounds_cache;
+        legend_resize_start_scale = boundedDescriptionScale(visible_course->description_scale);
+        legend_resize_current_scale = legend_resize_start_scale;
+        widget->setCursor(Qt::SizeFDiagCursor);
+        return true;
+    }
 
     if (legend_bounds_cache.contains(event->pos()))
     {
@@ -469,12 +495,38 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
     if (!show_description_table || !visible_course)
         return false;
 
+    if (legend_resizing)
+    {
+        const QPointF base = legend_resize_start_bounds.topLeft();
+        const QPointF start_delta = legend_resize_start_bounds.bottomRight() - base;
+        const QPointF current_delta = QPointF(event->pos()) - base;
+        const qreal denom = QPointF::dotProduct(start_delta, start_delta);
+        if (denom > 0.0)
+        {
+            const qreal ratio = QPointF::dotProduct(current_delta, start_delta) / denom;
+            const double scale = boundedDescriptionScale(legend_resize_start_scale * ratio);
+            if (scale != legend_resize_current_scale)
+            {
+                legend_resize_current_scale = scale;
+                emit visibleCourseDescriptionScaleChangeRequested(scale, false);
+                widget->updateEverything();
+            }
+        }
+        return true;
+    }
+
     if (legend_dragging)
     {
         const QPointF new_tl = QPointF(event->pos()) - legend_drag_offset;
         legend_anchor = widget->viewportToMapF(new_tl);
         widget->updateEverything();
         return true;
+    }
+
+    if (!legend_resize_handle_cache.isNull() && legend_resize_handle_cache.contains(event->pos()))
+    {
+        widget->setCursor(Qt::SizeFDiagCursor);
+        return false;
     }
 
     // Hover: change cursor when over legend
@@ -488,6 +540,14 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
 
 bool CourseOverlay::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (legend_resizing && event->button() == Qt::LeftButton)
+    {
+        legend_resizing = false;
+        emit visibleCourseDescriptionScaleChangeRequested(legend_resize_current_scale, true);
+        widget->setCursor(Qt::ArrowCursor);
+        return true;
+    }
+
     if (legend_dragging && event->button() == Qt::LeftButton)
     {
         legend_dragging = false;
@@ -578,6 +638,8 @@ void CourseOverlay::paintFinishCell(QPainter* painter, const QRectF& cell) const
 void CourseOverlay::paintDescriptionTable(QPainter* painter)
 {
     Q_ASSERT(visible_course);
+    legend_bounds_cache = QRectF();
+    legend_resize_handle_cache = QRectF();
 
     struct Row {
         int     seq;
@@ -633,7 +695,8 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
 
-    const qreal cell_px = mmToViewportPx(cell_mm);
+    const qreal description_scale = boundedDescriptionScale(visible_course->description_scale);
+    const qreal cell_px = mmToViewportPx(cell_mm * description_scale);
     const int cell = static_cast<int>(std::round(cell_px));
 
     constexpr int NCOLS = 8;
@@ -659,6 +722,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     const int y0 = static_cast<int>(std::round(tl.y()));
 
     legend_bounds_cache = QRectF(x0, y0, total_w, total_h);
+    legend_resize_handle_cache = legendResizeHandleRect(legend_bounds_cache);
 
     // Background
     painter->setPen(QPen(course_purple, 1));
@@ -684,7 +748,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
                           visible_course->name);
     }
 
-    // Info line: "N КП  •  D km  •  ↑ H m"
+    // Info line: "N controls - D km - Climb H m"
     {
         QFont inf;
         inf.setPixelSize(std::max(7, static_cast<int>(cell_px * 0.38)));
@@ -700,17 +764,17 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
 
         if (dist_m > 0.5)
         {
-            if (!info_text.isEmpty()) info_text += QLatin1String("  •  ");
+            if (!info_text.isEmpty()) info_text += QLatin1String("  -  ");
             if (dist_m >= 1000.0)
-                info_text += QString::number(dist_m / 1000.0, 'f', 1) + QLatin1String(" km");
+                info_text += tr("%1 km").arg(QString::number(dist_m / 1000.0, 'f', 1));
             else
-                info_text += QString::number(qRound(dist_m)) + QLatin1String(" m");
+                info_text += tr("%1 m").arg(QString::number(qRound(dist_m)));
         }
 
         if (visible_course->climb_m > 0)
         {
-            if (!info_text.isEmpty()) info_text += QLatin1String("  •  ");
-            info_text += QLatin1String("↑ ") + QString::number(visible_course->climb_m) + QLatin1String(" m");
+            if (!info_text.isEmpty()) info_text += QLatin1String("  -  ");
+            info_text += tr("Climb %1 m").arg(visible_course->climb_m);
         }
 
         painter->drawText(QRect(x0 + pad, y0 + name_h, total_w - 2 * pad, info_h),
@@ -779,6 +843,12 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     painter->setPen(QPen(course_purple, 1));
     painter->setBrush(Qt::NoBrush);
     painter->drawRect(x0, y0, total_w, total_h);
+
+    painter->setPen(QPen(course_purple, 1));
+    const QRectF grip = legend_resize_handle_cache.adjusted(2, 2, -2, -2);
+    painter->drawLine(grip.bottomLeft(), grip.topRight());
+    painter->drawLine(QPointF(grip.left() + grip.width() * 0.45, grip.bottom()),
+                      QPointF(grip.right(), grip.top() + grip.height() * 0.45));
 
     painter->restore();
 }

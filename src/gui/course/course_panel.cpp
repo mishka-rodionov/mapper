@@ -61,6 +61,22 @@ QString controlTypeLabel(ControlType t)
     }
 }
 
+double boundedDescriptionScale(double scale)
+{
+    if (!(scale > 0.0))
+        return 1.0;
+    if (scale < 0.25)
+        return 0.25;
+    if (scale > 2.0)
+        return 2.0;
+    return scale;
+}
+
+int descriptionScaleToPercent(double scale)
+{
+    return static_cast<int>(boundedDescriptionScale(scale) * 100.0 + 0.5);
+}
+
 }  // anonymous namespace
 
 
@@ -82,10 +98,10 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         type_btn_finish   = new QToolButton;
         type_btn_crossing = new QToolButton;
 
-        type_btn_start->setText(tr("△ Start"));
-        type_btn_regular->setText(tr("○ Control"));
-        type_btn_finish->setText(tr("◎ Finish"));
-        type_btn_crossing->setText(tr("✕ Crossing"));
+        type_btn_start->setText(tr("Start"));
+        type_btn_regular->setText(tr("Control"));
+        type_btn_finish->setText(tr("Finish"));
+        type_btn_crossing->setText(tr("Crossing"));
 
         type_btn_start->setToolTip(tr("Next placed control will be a Start (triangle)"));
         type_btn_regular->setToolTip(tr("Next placed control will be a regular Control (circle)"));
@@ -152,7 +168,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
 
         add_course_btn    = new QPushButton(tr("+"));
         rename_btn        = new QPushButton(tr("Rename"));
-        remove_course_btn = new QPushButton(tr("−"));
+        remove_course_btn = new QPushButton(tr("-"));
         add_course_btn->setToolTip(tr("Add course"));
         rename_btn->setToolTip(tr("Rename selected course"));
         remove_course_btn->setToolTip(tr("Remove selected course"));
@@ -173,8 +189,8 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
 
         add_entry_btn    = new QPushButton(tr("Add selected"));
         remove_entry_btn = new QPushButton(tr("Remove"));
-        entry_up_btn     = new QPushButton(tr("↑"));
-        entry_down_btn   = new QPushButton(tr("↓"));
+        entry_up_btn     = new QPushButton(tr("Up"));
+        entry_down_btn   = new QPushButton(tr("Down"));
         add_entry_btn->setToolTip(tr("Add the control selected in the Controls tab to this course"));
         remove_entry_btn->setToolTip(tr("Remove the selected entry from this course"));
 
@@ -206,14 +222,31 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         climb_row->addWidget(climb_label);
         climb_row->addWidget(climb_spinbox, 1);
 
+        legend_scale_label = new QLabel(tr("Legend scale:"));
+        legend_scale_spinbox = new QSpinBox;
+        legend_scale_spinbox->setRange(25, 200);
+        legend_scale_spinbox->setSingleStep(5);
+        legend_scale_spinbox->setSuffix(tr(" %"));
+        legend_scale_spinbox->setToolTip(tr("Scale of the control description table drawn on the map"));
+        legend_scale_spinbox->setEnabled(false);
+        legend_scale_label->setEnabled(false);
+
+        connect(legend_scale_spinbox, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &CoursePanelWidget::onLegendScaleValueChanged);
+
+        auto* legend_scale_row = new QHBoxLayout;
+        legend_scale_row->addWidget(legend_scale_label);
+        legend_scale_row->addWidget(legend_scale_spinbox, 1);
+
         auto* layout = new QVBoxLayout;
         layout->addWidget(new QLabel(tr("Courses:")));
         layout->addWidget(courses_list, 2);
         layout->addLayout(course_btns);
+        layout->addLayout(climb_row);
+        layout->addLayout(legend_scale_row);
         layout->addWidget(new QLabel(tr("Entries:")));
         layout->addWidget(entries_list, 3);
         layout->addLayout(entry_btns);
-        layout->addLayout(climb_row);
         layout->setContentsMargins(4, 4, 4, 4);
         auto* tab = new QWidget;
         tab->setLayout(layout);
@@ -224,6 +257,12 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
     main_layout->addWidget(tabs);
     main_layout->setContentsMargins(0, 0, 0, 0);
     setLayout(main_layout);
+
+    if (overlay)
+    {
+        connect(overlay, &CourseOverlay::visibleCourseDescriptionScaleChangeRequested,
+                this, &CoursePanelWidget::onLegendScaleChangeRequested);
+    }
 
     // Connect to database signals
     connect(&db, &CourseDatabase::controlAdded,   this, &CoursePanelWidget::rebuildControlsTree);
@@ -394,8 +433,17 @@ void CoursePanelWidget::onCourseSelectionChanged()
     rebuilding = true;
     climb_spinbox->setEnabled(idx >= 0);
     climb_label->setEnabled(idx >= 0);
+    legend_scale_spinbox->setEnabled(idx >= 0);
+    legend_scale_label->setEnabled(idx >= 0);
     if (idx >= 0)
+    {
         climb_spinbox->setValue(db.course(idx).climb_m);
+        legend_scale_spinbox->setValue(descriptionScaleToPercent(db.course(idx).description_scale));
+    }
+    else
+    {
+        legend_scale_spinbox->setValue(100);
+    }
     rebuilding = false;
 
     if (overlay)
@@ -412,6 +460,57 @@ void CoursePanelWidget::onClimbValueChanged(int value)
     updated.climb_m = value;
     db.updateCourse(idx, std::move(updated));
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+}
+
+void CoursePanelWidget::onLegendScaleValueChanged(int value)
+{
+    const int idx = selectedCourseIndex();
+    if (idx < 0 || rebuilding)
+        return;
+
+    const double scale = boundedDescriptionScale(value / 100.0);
+    auto snapshot = coursesSnapshot();
+    auto updated = db.course(idx);
+    if (updated.description_scale == scale)
+        return;
+
+    updated.description_scale = scale;
+    db.updateCourse(idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+}
+
+void CoursePanelWidget::onLegendScaleChangeRequested(double scale, bool commit)
+{
+    const int idx = selectedCourseIndex();
+    if (idx < 0)
+        return;
+
+    const double bounded_scale = boundedDescriptionScale(scale);
+    if (!legend_scale_drag_active)
+    {
+        legend_scale_drag_before = coursesSnapshot();
+        legend_scale_drag_active = true;
+    }
+
+    auto updated = db.course(idx);
+    const bool changed = (updated.description_scale != bounded_scale);
+    rebuilding = true;
+    if (changed)
+    {
+        updated.description_scale = bounded_scale;
+        db.updateCourse(idx, std::move(updated));
+    }
+    legend_scale_spinbox->setValue(descriptionScaleToPercent(bounded_scale));
+    rebuilding = false;
+
+    if (commit)
+    {
+        const auto after = coursesSnapshot();
+        if (legend_scale_drag_before != after)
+            map.push(new CoursesChangedUndoStep(&map, std::move(legend_scale_drag_before)));
+        legend_scale_drag_before.clear();
+        legend_scale_drag_active = false;
+    }
 }
 
 void CoursePanelWidget::addCourse()

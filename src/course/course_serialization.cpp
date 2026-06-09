@@ -20,6 +20,7 @@
 #include "course_serialization.h"
 
 #include <QLatin1String>
+#include <QtGlobal>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
@@ -50,6 +51,7 @@ static const QLatin1String attr_y            ("y");
 static const QLatin1String attr_name         ("name");
 static const QLatin1String attr_control      ("control");
 static const QLatin1String attr_climb        ("climb");
+static const QLatin1String attr_description_scale("description_scale");
 
 // ControlDescription attributes
 static const QLatin1String attr_code         ("code");
@@ -61,6 +63,8 @@ static const QLatin1String attr_location     ("location");
 static const QLatin1String attr_other        ("other");
 
 constexpr int current_courses_version = 1;
+constexpr double min_description_scale = 0.25;
+constexpr double max_description_scale = 2.0;
 
 
 QString controlTypeToString(ControlType t)
@@ -129,6 +133,8 @@ void saveCourse(QXmlStreamWriter& xml, const Course& c)
     elem.writeAttribute(attr_type, courseTypeToString(c.type));
     if (c.climb_m > 0)
         elem.writeAttribute(attr_climb, c.climb_m);
+    if (c.description_scale != 1.0)
+        elem.writeAttribute(attr_description_scale, c.description_scale);
     for (const auto& entry : c.entries)
     {
         XmlElementWriter entry_elem(xml, tag_entry);
@@ -179,6 +185,10 @@ Course loadCourse(QXmlStreamReader& xml)
     c.name    = attrs.value(attr_name).toString();
     c.type    = courseTypeFromString(attrs.value(attr_type));
     c.climb_m = attrs.value(attr_climb).toInt();
+    bool scale_ok = false;
+    const double scale = attrs.value(attr_description_scale).toDouble(&scale_ok);
+    if (scale_ok && scale > 0.0)
+        c.description_scale = qBound(min_description_scale, scale, max_description_scale);
 
     while (xml.readNextStartElement())
     {

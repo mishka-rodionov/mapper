@@ -27,7 +27,8 @@ bool Course::operator==(const Course& other) const noexcept
     return name    == other.name
         && type    == other.type
         && entries == other.entries
-        && climb_m == other.climb_m;
+        && climb_m == other.climb_m
+        && description_scale == other.description_scale;
 }
 
 

@@ -95,6 +95,8 @@ private slots:
     // Entries tab actions
     void addSelectedControlToCourse();
     void onClimbValueChanged(int value);
+    void onLegendScaleValueChanged(int value);
+    void onLegendScaleChangeRequested(double scale, bool commit);
     void removeEntryFromCourse();
     void moveEntryUp();
     void moveEntryDown();
@@ -139,6 +141,11 @@ private:
 
     QLabel*       climb_label     = nullptr;
     QSpinBox*     climb_spinbox   = nullptr;
+    QLabel*       legend_scale_label   = nullptr;
+    QSpinBox*     legend_scale_spinbox = nullptr;
+
+    std::vector<Course> legend_scale_drag_before;
+    bool legend_scale_drag_active = false;
 
     QString selected_control_id;  ///< Currently highlighted control
     bool rebuilding = false;       ///< Guard against recursive rebuild

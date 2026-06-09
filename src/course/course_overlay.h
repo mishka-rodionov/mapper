@@ -91,6 +91,10 @@ public:
     bool mouseMoveEvent(QMouseEvent* event);
     bool mouseReleaseEvent(QMouseEvent* event);
 
+signals:
+    void visibleCourseDescriptionScaleChangeRequested(double scale, bool commit);
+
+public:
     // ISCD column-specific symbol renderers (static: no instance state required)
     static void drawISCDFeatureSymbol(QPainter* painter, const QString& feature, const QRectF& r);
     static void drawISCDPartSymbol(QPainter* painter, const QString& part, const QRectF& r);
@@ -156,8 +160,13 @@ private:
     MapCoordF legend_anchor;             ///< Top-left of legend in map coords (native units)
     bool legend_anchor_initialized = false;
     bool legend_dragging = false;
+    bool legend_resizing = false;
     QPointF legend_drag_offset;          ///< Click pos relative to legend top-left (viewport px)
+    QRectF legend_resize_start_bounds;
+    double legend_resize_start_scale = 1.0;
+    double legend_resize_current_scale = 1.0;
     mutable QRectF legend_bounds_cache;  ///< Updated each paint; used for hit-testing
+    mutable QRectF legend_resize_handle_cache;
 };
 
 
