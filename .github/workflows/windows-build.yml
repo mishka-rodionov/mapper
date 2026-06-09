@@ -24,6 +24,7 @@ jobs:
           update: true
           install: >-
             git
+            zip
             mingw-w64-x86_64-toolchain
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-ninja
@@ -84,7 +85,7 @@ jobs:
           cp -r /mingw64/share/proj "$DIST/share/" 2>/dev/null || true
           cp -r /mingw64/share/gdal "$DIST/share/" 2>/dev/null || true
 
-          cd dist && 7z a -tzip "../Mapper-windows-x64.zip" Mapper
+          cd dist && zip -r "../Mapper-windows-x64.zip" Mapper
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
