@@ -140,7 +140,8 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         controls_tree->setHeaderLabels({tr("Code"), tr("Type")});
         controls_tree->setContextMenuPolicy(Qt::CustomContextMenu);
         controls_tree->setRootIsDecorated(false);
-        controls_tree->setSelectionMode(QAbstractItemView::SingleSelection);
+        controls_tree->setSelectionBehavior(QAbstractItemView::SelectRows);
+        controls_tree->setSelectionMode(QAbstractItemView::MultiSelection);
 
         connect(controls_tree, &QTreeWidget::itemClicked,
                 this, &CoursePanelWidget::onControlItemClicked);
@@ -191,7 +192,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         remove_entry_btn = new QPushButton(tr("Remove"));
         entry_up_btn     = new QPushButton(tr("Up"));
         entry_down_btn   = new QPushButton(tr("Down"));
-        add_entry_btn->setToolTip(tr("Add the control selected in the Controls tab to this course"));
+        add_entry_btn->setToolTip(tr("Add the controls selected in the Controls tab to this course"));
         remove_entry_btn->setToolTip(tr("Remove the selected entry from this course"));
 
         connect(add_entry_btn,    &QPushButton::clicked, this, &CoursePanelWidget::addSelectedControlToCourse);
@@ -293,6 +294,11 @@ void CoursePanelWidget::selectControl(const QString& control_id)
 {
     selected_control_id = control_id;
     properties_widget->setControl(control_id);
+    controls_tree->clearSelection();
+
+    if (control_id.isEmpty())
+        return;
+
     // Find and highlight in tree
     for (int i = 0; i < controls_tree->topLevelItemCount(); ++i)
     {
@@ -563,15 +569,20 @@ void CoursePanelWidget::removeCourse()
 
 void CoursePanelWidget::addSelectedControlToCourse()
 {
-    if (selected_control_id.isEmpty()) return;
     const int idx = selectedCourseIndex();
     if (idx < 0) return;
 
+    const auto control_ids = selectedControlIds();
+    if (control_ids.empty()) return;
+
     auto snapshot = coursesSnapshot();
     auto updated = db.course(idx);
-    CourseEntry entry;
-    entry.control_id = selected_control_id;
-    updated.entries.push_back(std::move(entry));
+    for (const auto& control_id : control_ids)
+    {
+        CourseEntry entry;
+        entry.control_id = control_id;
+        updated.entries.push_back(std::move(entry));
+    }
     db.updateCourse(idx, std::move(updated));
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
 }
@@ -633,6 +644,19 @@ std::vector<Course> CoursePanelWidget::coursesSnapshot() const
     for (int i = 0; i < db.numCourses(); ++i)
         snap.push_back(db.course(i));
     return snap;
+}
+
+std::vector<QString> CoursePanelWidget::selectedControlIds() const
+{
+    std::vector<QString> ids;
+    ids.reserve(std::size_t(controls_tree->selectedItems().size()));
+    for (int i = 0; i < controls_tree->topLevelItemCount(); ++i)
+    {
+        const auto* item = controls_tree->topLevelItem(i);
+        if (item->isSelected())
+            ids.push_back(item->data(0, Qt::UserRole).toString());
+    }
+    return ids;
 }
 
 int CoursePanelWidget::selectedCourseIndex() const

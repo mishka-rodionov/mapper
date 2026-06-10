@@ -51,6 +51,7 @@ class QXmlStreamWriter;
 
 namespace OpenOrienteering {
 
+class CourseOverlay;
 class Map;
 class MapView;
 class Template;
@@ -426,6 +427,9 @@ public slots:
 	
 	/** Controls the color mode. */
 	void setColorMode(MapPrinterOptions::ColorMode color_mode);
+
+	/** Sets an optional course overlay to print/export above the map. */
+	void setCourseOverlay(CourseOverlay* overlay);
 	
 	/** Saves the print parameter (to the map). */
 	void saveConfig() const;
@@ -486,6 +490,7 @@ protected:
 	
 	Map& map;
 	const MapView* view;
+	CourseOverlay* course_overlay = nullptr;
 	const QPrinterInfo* target = nullptr;
 	QPrinterInfo target_copy;
 	qreal scale_adjustment;

@@ -139,6 +139,8 @@ PrintWidget::PrintWidget(Map* map, MainWindow* main_window, MapView* main_view, 
 , active      { false }
 {
 	Q_ASSERT(main_window);
+	if (editor)
+		map_printer->setCourseOverlay(editor->getMainWidget()->courseOverlay());
 	
 	layout = new QFormLayout();
 	
@@ -1176,6 +1178,9 @@ void PrintWidget::previewClicked()
 	// Qt for Android has no QPrintPreviewDialog
 	QMessageBox::warning(this, tr("Error"), tr("Not supported on Android."));
 #else
+	if (editor)
+		map_printer->setCourseOverlay(editor->getMainWidget()->courseOverlay());
+
 	if (checkForEmptyMap())
 		return;
 	
@@ -1205,6 +1210,9 @@ void PrintWidget::previewClicked()
 // slot
 void PrintWidget::printClicked()
 {
+	if (editor)
+		map_printer->setCourseOverlay(editor->getMainWidget()->courseOverlay());
+
 	if (checkForEmptyMap())
 		return;
 	

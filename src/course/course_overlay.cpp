@@ -37,6 +37,7 @@
 #include <QRectF>
 #include <QSize>
 #include <QString>
+#include <QTransform>
 #include <QVector>
 
 #include <QCoreApplication>
@@ -132,6 +133,16 @@ QRectF legendResizeHandleRect(const QRectF& bounds)
 {
     const qreal size = 12.0;
     return QRectF(bounds.right() - size, bounds.bottom() - size, size, size);
+}
+
+bool courseUsesControl(const Course& course, const QString& control_id)
+{
+    for (const auto& entry : course.entries)
+    {
+        if (entry.control_id == control_id)
+            return true;
+    }
+    return false;
 }
 
 // ── Custom-path rendering helpers ────────────────────────────────────────────
@@ -251,26 +262,43 @@ void CourseOverlay::onDatabaseChanged()
 
 void CourseOverlay::paint(QPainter* painter)
 {
+    PaintContext context;
+    paint(painter, context);
+}
+
+void CourseOverlay::paintForPrint(QPainter* painter, const QTransform& map_to_painter,
+                                  const QSizeF& page_size, qreal pixels_per_mm)
+{
+    PaintContext context;
+    context.map_to_viewport = &map_to_painter;
+    context.viewport_size = page_size;
+    context.pixels_per_mm = pixels_per_mm;
+    context.interactive = false;
+    paint(painter, context);
+}
+
+void CourseOverlay::paint(QPainter* painter, const PaintContext& context)
+{
     if (db.numControls() == 0)
         return;
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
 
-    paintAllControls(painter);
+    paintAllControls(painter, context);
     if (visible_course)
-        paintCourse(painter, *visible_course);
+        paintCourse(painter, *visible_course, context);
 
     painter->restore();
 
     if (show_description_table && visible_course)
-        paintDescriptionTable(painter);
+        paintDescriptionTable(painter, context);
 }
 
 
 // --- Course / controls rendering ---
 
-void CourseOverlay::paintCourse(QPainter* painter, const Course& course) const
+void CourseOverlay::paintCourse(QPainter* painter, const Course& course, const PaintContext& context) const
 {
     if (course.entries.empty())
         return;
@@ -284,13 +312,13 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course) const
     }
 
     for (int i = 1; i < resolved.size(); ++i)
-        paintLeg(painter, toViewport(*resolved[i-1]), toViewport(*resolved[i]));
+        paintLeg(painter, toViewport(*resolved[i-1], context), toViewport(*resolved[i], context), context);
 
     int seq = 1;
     for (int i = 0; i < resolved.size(); ++i)
     {
         const auto* ctrl = resolved[i];
-        QPointF pos = toViewport(*ctrl);
+        QPointF pos = toViewport(*ctrl, context);
 
         switch (ctrl->type)
         {
@@ -299,47 +327,50 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course) const
             double rot = 0.0;
             if (i + 1 < resolved.size())
             {
-                QPointF next = toViewport(*resolved[i+1]);
+                QPointF next = toViewport(*resolved[i+1], context);
                 QPointF d = next - pos;
                 rot = std::atan2(d.y(), d.x());
             }
-            paintStart(painter, pos, rot);
+            paintStart(painter, pos, rot, context);
             break;
         }
         case ControlType::Finish:
-            paintFinish(painter, pos);
+            paintFinish(painter, pos, context);
             break;
         case ControlType::CrossingPoint:
-            paintCrossingPoint(painter, pos);
+            paintCrossingPoint(painter, pos, context);
             break;
         default:
-            paintControl(painter, pos, QString::number(seq));
+            paintControl(painter, pos, QString::number(seq), context);
             ++seq;
             break;
         }
     }
 }
 
-void CourseOverlay::paintAllControls(QPainter* painter) const
+void CourseOverlay::paintAllControls(QPainter* painter, const PaintContext& context) const
 {
     for (int i = 0; i < db.numControls(); ++i)
     {
         const auto& ctrl = db.control(i);
-        QPointF pos = toViewport(ctrl);
+        if (visible_course && courseUsesControl(*visible_course, ctrl.id))
+            continue;
+
+        QPointF pos = toViewport(ctrl, context);
 
         switch (ctrl.type)
         {
         case ControlType::Start:
-            paintStart(painter, pos, 0.0);
+            paintStart(painter, pos, 0.0, context);
             break;
         case ControlType::Finish:
-            paintFinish(painter, pos);
+            paintFinish(painter, pos, context);
             break;
         case ControlType::CrossingPoint:
-            paintCrossingPoint(painter, pos);
+            paintCrossingPoint(painter, pos, context);
             break;
         default:
-            paintControl(painter, pos, ctrl.description.code.isEmpty() ? ctrl.id : ctrl.description.code);
+            paintControl(painter, pos, ctrl.description.code.isEmpty() ? ctrl.id : ctrl.description.code, context);
             break;
         }
     }
@@ -348,13 +379,13 @@ void CourseOverlay::paintAllControls(QPainter* painter) const
 
 // --- Individual symbol painters ---
 
-void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to) const
+void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to, const PaintContext& context) const
 {
-    const qreal lw = mmToViewportPx(line_width_mm);
+    const qreal lw = mmToViewportPx(line_width_mm, context);
     painter->setPen(QPen(course_purple, lw));
     painter->setBrush(Qt::NoBrush);
 
-    const qreal r = mmToViewportPx(circle_diameter_mm / 2.0);
+    const qreal r = mmToViewportPx(circle_diameter_mm / 2.0, context);
     QPointF d = to - from;
     const qreal len = std::sqrt(d.x() * d.x() + d.y() * d.y());
     if (len < 2 * r)
@@ -367,10 +398,10 @@ void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to) const
     painter->drawLine(start, end);
 }
 
-void CourseOverlay::paintStart(QPainter* painter, QPointF pos, double rotation_rad) const
+void CourseOverlay::paintStart(QPainter* painter, QPointF pos, double rotation_rad, const PaintContext& context) const
 {
-    const qreal lw   = mmToViewportPx(line_width_mm);
-    const qreal side = mmToViewportPx(triangle_size_mm);
+    const qreal lw   = mmToViewportPx(line_width_mm, context);
+    const qreal side = mmToViewportPx(triangle_size_mm, context);
 
     painter->setPen(QPen(course_purple, lw));
     painter->setBrush(Qt::NoBrush);
@@ -391,23 +422,23 @@ void CourseOverlay::paintStart(QPainter* painter, QPointF pos, double rotation_r
     painter->drawPolygon(triangle);
 }
 
-void CourseOverlay::paintControl(QPainter* painter, QPointF pos, const QString& number) const
+void CourseOverlay::paintControl(QPainter* painter, QPointF pos, const QString& number, const PaintContext& context) const
 {
-    const qreal lw = mmToViewportPx(line_width_mm);
-    const qreal r  = mmToViewportPx(circle_diameter_mm / 2.0);
+    const qreal lw = mmToViewportPx(line_width_mm, context);
+    const qreal r  = mmToViewportPx(circle_diameter_mm / 2.0, context);
 
     painter->setPen(QPen(course_purple, lw));
     painter->setBrush(Qt::NoBrush);
     painter->drawEllipse(pos, r, r);
 
-    paintControlNumber(painter, pos, number);
+    paintControlNumber(painter, pos, number, context);
 }
 
-void CourseOverlay::paintFinish(QPainter* painter, QPointF pos) const
+void CourseOverlay::paintFinish(QPainter* painter, QPointF pos, const PaintContext& context) const
 {
-    const qreal lw      = mmToViewportPx(line_width_mm);
-    const qreal r_outer = mmToViewportPx(finish_outer_mm / 2.0);
-    const qreal r_inner = mmToViewportPx(finish_inner_mm / 2.0);
+    const qreal lw      = mmToViewportPx(line_width_mm, context);
+    const qreal r_outer = mmToViewportPx(finish_outer_mm / 2.0, context);
+    const qreal r_inner = mmToViewportPx(finish_inner_mm / 2.0, context);
 
     painter->setPen(QPen(course_purple, lw));
     painter->setBrush(Qt::NoBrush);
@@ -415,10 +446,10 @@ void CourseOverlay::paintFinish(QPainter* painter, QPointF pos) const
     painter->drawEllipse(pos, r_inner, r_inner);
 }
 
-void CourseOverlay::paintCrossingPoint(QPainter* painter, QPointF pos) const
+void CourseOverlay::paintCrossingPoint(QPainter* painter, QPointF pos, const PaintContext& context) const
 {
-    const qreal lw = mmToViewportPx(line_width_mm);
-    const qreal r  = mmToViewportPx(2.5);
+    const qreal lw = mmToViewportPx(line_width_mm, context);
+    const qreal r  = mmToViewportPx(2.5, context);
 
     painter->setPen(QPen(course_purple, lw));
     painter->setBrush(Qt::NoBrush);
@@ -426,16 +457,16 @@ void CourseOverlay::paintCrossingPoint(QPainter* painter, QPointF pos) const
     painter->drawLine(QPointF(pos.x() - r, pos.y() + r), QPointF(pos.x() + r, pos.y() - r));
 }
 
-void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const QString& number) const
+void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const QString& number, const PaintContext& context) const
 {
     if (number.isEmpty())
         return;
 
-    const qreal r      = mmToViewportPx(circle_diameter_mm / 2.0);
-    const qreal offset = mmToViewportPx(number_offset_mm);
+    const qreal r      = mmToViewportPx(circle_diameter_mm / 2.0, context);
+    const qreal offset = mmToViewportPx(number_offset_mm, context);
 
     QFont font;
-    font.setPixelSize(static_cast<int>(mmToViewportPx(3.0)));
+    font.setPixelSize(static_cast<int>(mmToViewportPx(3.0, context)));
     font.setBold(true);
     painter->setFont(font);
 
@@ -448,13 +479,45 @@ void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const 
 
 // --- Coordinate conversion ---
 
-QPointF CourseOverlay::toViewport(const CourseControl& ctrl) const
+QPointF CourseOverlay::toViewport(const CourseControl& ctrl, const PaintContext& context) const
 {
-    return widget->mapToViewport(MapCoordF(ctrl.position));
+    return toViewport(MapCoordF(ctrl.position), context);
 }
 
-qreal CourseOverlay::mmToViewportPx(qreal mm) const
+QPointF CourseOverlay::toViewport(const MapCoordF& coord, const PaintContext& context) const
 {
+    if (context.map_to_viewport)
+        return context.map_to_viewport->map(static_cast<QPointF>(coord));
+
+    return widget->mapToViewport(static_cast<QPointF>(coord));
+}
+
+MapCoordF CourseOverlay::viewportToMap(const QPointF& point, const PaintContext& context) const
+{
+    if (context.map_to_viewport)
+    {
+        bool invertible = false;
+        const auto viewport_to_map = context.map_to_viewport->inverted(&invertible);
+        if (invertible)
+            return MapCoordF(viewport_to_map.map(point));
+    }
+
+    return widget->viewportToMapF(point);
+}
+
+QSizeF CourseOverlay::viewportSize(const PaintContext& context) const
+{
+    if (context.viewport_size.isValid() && !context.viewport_size.isEmpty())
+        return context.viewport_size;
+
+    return widget->size();
+}
+
+qreal CourseOverlay::mmToViewportPx(qreal mm, const PaintContext& context) const
+{
+    if (context.map_to_viewport)
+        return mm * context.pixels_per_mm;
+
     return widget->getMapView()->lengthToPixel(mm * 1000.0);
 }
 
@@ -635,11 +698,14 @@ void CourseOverlay::paintFinishCell(QPainter* painter, const QRectF& cell) const
 }
 
 
-void CourseOverlay::paintDescriptionTable(QPainter* painter)
+void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext& context)
 {
     Q_ASSERT(visible_course);
-    legend_bounds_cache = QRectF();
-    legend_resize_handle_cache = QRectF();
+    if (context.interactive)
+    {
+        legend_bounds_cache = QRectF();
+        legend_resize_handle_cache = QRectF();
+    }
 
     struct Row {
         int     seq;
@@ -696,7 +762,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     painter->setRenderHint(QPainter::Antialiasing, true);
 
     const qreal description_scale = boundedDescriptionScale(visible_course->description_scale);
-    const qreal cell_px = mmToViewportPx(cell_mm * description_scale);
+    const qreal cell_px = mmToViewportPx(cell_mm * description_scale, context);
     const int cell = static_cast<int>(std::round(cell_px));
 
     constexpr int NCOLS = 8;
@@ -711,26 +777,33 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     // Initialize anchor (default: bottom-left of widget)
     if (!legend_anchor_initialized)
     {
-        const int margin = static_cast<int>(mmToViewportPx(5.0));
-        const QPointF default_tl(margin, widget->size().height() - total_h - margin);
-        legend_anchor = widget->viewportToMapF(default_tl);
+        const int margin = static_cast<int>(mmToViewportPx(5.0, context));
+        const auto size = viewportSize(context);
+        const QPointF default_tl(margin, size.height() - total_h - margin);
+        legend_anchor = viewportToMap(default_tl, context);
         legend_anchor_initialized = true;
     }
 
-    const QPointF tl = widget->mapToViewport(legend_anchor);
+    const QPointF tl = toViewport(legend_anchor, context);
     const int x0 = static_cast<int>(std::round(tl.x()));
     const int y0 = static_cast<int>(std::round(tl.y()));
 
-    legend_bounds_cache = QRectF(x0, y0, total_w, total_h);
-    legend_resize_handle_cache = legendResizeHandleRect(legend_bounds_cache);
+    const QRectF legend_bounds(x0, y0, total_w, total_h);
+    const QRectF legend_resize_handle = legendResizeHandleRect(legend_bounds);
+    if (context.interactive)
+    {
+        legend_bounds_cache = legend_bounds;
+        legend_resize_handle_cache = legend_resize_handle;
+    }
 
     // Background
     painter->setPen(QPen(course_purple, 1));
-    painter->setBrush(QColor(255, 255, 255, 230));
+    painter->setBrush(context.interactive ? QColor(255, 255, 255, 230) : QColor(Qt::white));
     painter->drawRect(x0, y0, total_w, total_h);
 
     // ── Double-height header ──────────────────────────────────────────
-    painter->fillRect(x0, y0, total_w, header_h, QColor(148, 0, 211, 35));
+    painter->fillRect(x0, y0, total_w, header_h,
+                      context.interactive ? QColor(148, 0, 211, 35) : QColor(246, 238, 250));
 
     const int pad = std::max(2, cell / 8);
     const int name_h = cell;          // top cell: course name
@@ -845,10 +918,13 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter)
     painter->drawRect(x0, y0, total_w, total_h);
 
     painter->setPen(QPen(course_purple, 1));
-    const QRectF grip = legend_resize_handle_cache.adjusted(2, 2, -2, -2);
-    painter->drawLine(grip.bottomLeft(), grip.topRight());
-    painter->drawLine(QPointF(grip.left() + grip.width() * 0.45, grip.bottom()),
-                      QPointF(grip.right(), grip.top() + grip.height() * 0.45));
+    if (context.interactive)
+    {
+        const QRectF grip = legend_resize_handle.adjusted(2, 2, -2, -2);
+        painter->drawLine(grip.bottomLeft(), grip.topRight());
+        painter->drawLine(QPointF(grip.left() + grip.width() * 0.45, grip.bottom()),
+                          QPointF(grip.right(), grip.top() + grip.height() * 0.45));
+    }
 
     painter->restore();
 }

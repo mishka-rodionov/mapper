@@ -105,6 +105,9 @@ private:
     /** Captures a snapshot of all courses for an undo step. */
     std::vector<Course> coursesSnapshot() const;
 
+    /** Returns selected control ids in their current list order. */
+    std::vector<QString> selectedControlIds() const;
+
     /** Pushes CoursesChangedUndoStep then commits the new courses. */
     void commitCoursesChange(std::vector<Course> before_snapshot,
                              std::vector<Course> new_courses);

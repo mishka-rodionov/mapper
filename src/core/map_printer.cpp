@@ -60,6 +60,7 @@
 #include "core/map_grid.h"
 #include "core/map_view.h"
 #include "core/renderables/renderable.h"
+#include "course/course_overlay.h"
 #include "templates/template.h"
 #include "util/xml_stream_util.h"
 
@@ -768,6 +769,11 @@ void MapPrinter::setColorMode(MapPrinterOptions::ColorMode color_mode)
 	}
 }
 
+void MapPrinter::setCourseOverlay(CourseOverlay* overlay)
+{
+	course_overlay = overlay;
+}
+
 bool MapPrinter::isOutputEmpty() const
 {
 	return (
@@ -1215,6 +1221,20 @@ void MapPrinter::drawPage(QPainter* device_painter, const QRectF& page_extent, c
 			page_painter->drawImage(0, 0, local_buffer);
 		}
 		
+		page_painter->restore();
+	}
+
+	if (course_overlay)
+	{
+		page_painter->save();
+
+		page_painter->setRenderHints(render_hints);
+		page_painter->setClipRect(page_extent_transform.mapRect(page_region_used), Qt::ReplaceClip);
+		course_overlay->paintForPrint(page_painter,
+		                              page_extent_transform,
+		                              page_format.paper_dimensions * units_per_mm,
+		                              units_per_mm * scale_adjustment);
+
 		page_painter->restore();
 	}
 	

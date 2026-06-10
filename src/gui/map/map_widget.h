@@ -317,6 +317,8 @@ public:
 	
 	/** Sets the course overlay to use. Called by CourseOverlay constructor/destructor. */
 	void setCourseOverlay(CourseOverlay* overlay);
+	/** Returns the current course overlay, if any. */
+	CourseOverlay* courseOverlay() const;
 
 	/** Sets the GPS display to use. This is called internally by the GPSDisplay constructor. */
 	void setGPSDisplay(GPSDisplay* gps_display);
@@ -585,6 +587,12 @@ inline
 MapWidget::CoordsType MapWidget::getCoordsDisplay() const
 {
 	return coords_type;
+}
+
+inline
+CourseOverlay* MapWidget::courseOverlay() const
+{
+	return course_overlay;
 }
 
 

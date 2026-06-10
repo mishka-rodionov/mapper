@@ -25,11 +25,13 @@
 #include <QPointF>
 #include <QPolygonF>
 #include <QRectF>
+#include <QSizeF>
 
 #include "core/map_coord.h"
 
 class QMouseEvent;
 class QPainter;
+class QTransform;
 
 namespace OpenOrienteering {
 
@@ -84,6 +86,12 @@ public:
     void paint(QPainter* painter);
 
     /**
+     * Called by MapPrinter to paint the overlay in page/device coordinates.
+     */
+    void paintForPrint(QPainter* painter, const QTransform& map_to_painter,
+                       const QSizeF& page_size, qreal pixels_per_mm);
+
+    /**
      * Mouse event handlers called by MapWidget before tool dispatch.
      * Return true if the event was consumed (legend was hit/dragged).
      */
@@ -111,19 +119,29 @@ private slots:
     void onDatabaseChanged();
 
 private:
-    // --- Course / control paint helpers ---
-    void paintCourse(QPainter* painter, const Course& course) const;
-    void paintAllControls(QPainter* painter) const;
+    struct PaintContext
+    {
+        const QTransform* map_to_viewport = nullptr;
+        QSizeF viewport_size;
+        qreal pixels_per_mm = 0.0;
+        bool interactive = true;
+    };
 
-    void paintLeg(QPainter* painter, QPointF from, QPointF to) const;
-    void paintStart(QPainter* painter, QPointF pos, double rotation_rad) const;
-    void paintControl(QPainter* painter, QPointF pos, const QString& number) const;
-    void paintFinish(QPainter* painter, QPointF pos) const;
-    void paintCrossingPoint(QPainter* painter, QPointF pos) const;
-    void paintControlNumber(QPainter* painter, QPointF center, const QString& number) const;
+    void paint(QPainter* painter, const PaintContext& context);
+
+    // --- Course / control paint helpers ---
+    void paintCourse(QPainter* painter, const Course& course, const PaintContext& context) const;
+    void paintAllControls(QPainter* painter, const PaintContext& context) const;
+
+    void paintLeg(QPainter* painter, QPointF from, QPointF to, const PaintContext& context) const;
+    void paintStart(QPainter* painter, QPointF pos, double rotation_rad, const PaintContext& context) const;
+    void paintControl(QPainter* painter, QPointF pos, const QString& number, const PaintContext& context) const;
+    void paintFinish(QPainter* painter, QPointF pos, const PaintContext& context) const;
+    void paintCrossingPoint(QPainter* painter, QPointF pos, const PaintContext& context) const;
+    void paintControlNumber(QPainter* painter, QPointF center, const QString& number, const PaintContext& context) const;
 
     // --- IOF description table ---
-    void paintDescriptionTable(QPainter* painter);
+    void paintDescriptionTable(QPainter* painter, const PaintContext& context);
 
     /** Draws the content of one ISCD cell.  column is 0-based (0=A … 7=H). */
     void paintISCDCell(QPainter* painter, const QString& text,
@@ -140,13 +158,16 @@ private:
 
     // --- Coordinate conversion ---
     /** Converts a MapCoord (1/1000 mm) to viewport pixel coordinates. */
-    QPointF toViewport(const CourseControl& ctrl) const;
+    QPointF toViewport(const CourseControl& ctrl, const PaintContext& context) const;
+    QPointF toViewport(const MapCoordF& coord, const PaintContext& context) const;
+    MapCoordF viewportToMap(const QPointF& point, const PaintContext& context) const;
+    QSizeF viewportSize(const PaintContext& context) const;
 
     /**
      * Converts millimeters on map paper to viewport pixels at the current zoom.
      * e.g. a 5mm IOF circle at 2× zoom = 2× more pixels.
      */
-    qreal mmToViewportPx(qreal mm) const;
+    qreal mmToViewportPx(qreal mm, const PaintContext& context) const;
 
     static QJsonObject s_custom;
 
