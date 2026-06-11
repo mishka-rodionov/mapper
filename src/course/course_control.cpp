@@ -36,10 +36,11 @@ bool ControlDescription::operator==(const ControlDescription& other) const noexc
 
 bool CourseControl::operator==(const CourseControl& other) const noexcept
 {
-    return id          == other.id
-        && position    == other.position
-        && type        == other.type
-        && description == other.description;
+    return id            == other.id
+        && position      == other.position
+        && number_offset == other.number_offset
+        && type          == other.type
+        && description   == other.description;
 }
 
 

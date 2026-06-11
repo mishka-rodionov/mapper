@@ -134,6 +134,55 @@ void MoveControlUndoStep::saveImpl(QXmlStreamWriter& xml) const
 
 
 // ============================================================
+// MoveControlNumberUndoStep
+// ============================================================
+
+MoveControlNumberUndoStep::MoveControlNumberUndoStep(
+        Map* map,
+        QString control_id,
+        MapCoordF old_offset,
+        MapCoordF new_offset)
+: UndoStep(CourseControlNumberMovedType, map)
+, control_id(std::move(control_id))
+, old_offset(old_offset)
+, new_offset(new_offset)
+{}
+
+UndoStep* MoveControlNumberUndoStep::undo()
+{
+    CourseDatabase& db = map->courseDatabase();
+
+    auto* ctrl = db.findById(control_id);
+    if (!ctrl)
+        return new NoOpUndoStep(map, true);
+
+    int index = -1;
+    for (int i = 0; i < db.numControls(); ++i)
+    {
+        if (db.control(i).id == control_id)
+        {
+            index = i;
+            break;
+        }
+    }
+    if (index < 0)
+        return new NoOpUndoStep(map, true);
+
+    const auto current_offset = ctrl->number_offset;
+    auto updated = *ctrl;
+    updated.number_offset = old_offset;
+    db.updateControl(index, std::move(updated));
+
+    return new MoveControlNumberUndoStep(map, control_id, current_offset, old_offset);
+}
+
+void MoveControlNumberUndoStep::saveImpl(QXmlStreamWriter& xml) const
+{
+    UndoStep::saveImpl(xml);
+}
+
+
+// ============================================================
 // ModifyControlDescriptionUndoStep
 // ============================================================
 

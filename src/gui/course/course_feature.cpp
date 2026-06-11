@@ -103,6 +103,8 @@ void CourseFeature::showPanelToggled(bool show)
 
     if (dock_widget)
         dock_widget->setVisible(show);
+
+    course_overlay->setPlanningActive(show);
 }
 
 void CourseFeature::activatePlaceControlTool()

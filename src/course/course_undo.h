@@ -100,6 +100,28 @@ private:
 
 
 /**
+ * Undo step for when a control number label was moved.
+ * undo() restores the old label offset.
+ */
+class MoveControlNumberUndoStep : public UndoStep
+{
+public:
+    MoveControlNumberUndoStep(Map* map, QString control_id, MapCoordF old_offset, MapCoordF new_offset);
+    ~MoveControlNumberUndoStep() override = default;
+
+    UndoStep* undo() override;
+
+protected:
+    void saveImpl(QXmlStreamWriter& xml) const override;
+
+private:
+    QString   control_id;
+    MapCoordF old_offset;
+    MapCoordF new_offset;
+};
+
+
+/**
  * Undo step for when a control's IOF description was edited.
  * undo() restores the old description.
  */

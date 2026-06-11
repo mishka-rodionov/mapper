@@ -49,6 +49,7 @@
 #include "course/course.h"
 #include "course/course_control.h"
 #include "course/course_database.h"
+#include "course/course_undo.h"
 #include "core/map_coord.h"
 #include "core/map_view.h"
 #include "gui/map/map_widget.h"
@@ -226,7 +227,7 @@ bool tryDrawCustomPath(QPainter* painter, const QString& key, const QRectF& rect
 }  // anonymous namespace
 
 
-CourseOverlay::CourseOverlay(MapWidget* widget, const CourseDatabase& db, QObject* parent)
+CourseOverlay::CourseOverlay(MapWidget* widget, CourseDatabase& db, QObject* parent)
 : QObject(parent)
 , widget(widget)
 , db(db)
@@ -252,9 +253,30 @@ void CourseOverlay::setVisibleCourse(const Course* course)
     widget->updateEverything();
 }
 
+void CourseOverlay::setPlanningActive(bool active)
+{
+    if (planning_active == active)
+        return;
+
+    planning_active = active;
+    if (!planning_active)
+    {
+        legend_dragging = false;
+        legend_resizing = false;
+        number_dragging = false;
+        number_drag_control_id.clear();
+        number_hit_cache.clear();
+        legend_bounds_cache = {};
+        legend_resize_handle_cache = {};
+    }
+
+    widget->updateEverything();
+}
+
 void CourseOverlay::onDatabaseChanged()
 {
-    widget->updateEverything();
+    if (planning_active)
+        widget->updateEverything();
 }
 
 
@@ -279,13 +301,22 @@ void CourseOverlay::paintForPrint(QPainter* painter, const QTransform& map_to_pa
 
 void CourseOverlay::paint(QPainter* painter, const PaintContext& context)
 {
+    if (context.interactive)
+    {
+        number_hit_cache.clear();
+        if (!planning_active)
+            return;
+    }
+
     if (db.numControls() == 0)
         return;
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
 
-    paintAllControls(painter, context);
+    if (context.interactive)
+        paintAllControls(painter, context);
+
     if (visible_course)
         paintCourse(painter, *visible_course, context);
 
@@ -341,7 +372,7 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course, const P
             paintCrossingPoint(painter, pos, context);
             break;
         default:
-            paintControl(painter, pos, QString::number(seq), context);
+            paintControl(painter, pos, *ctrl, QString::number(seq), context);
             ++seq;
             break;
         }
@@ -370,7 +401,7 @@ void CourseOverlay::paintAllControls(QPainter* painter, const PaintContext& cont
             paintCrossingPoint(painter, pos, context);
             break;
         default:
-            paintControl(painter, pos, ctrl.description.code.isEmpty() ? ctrl.id : ctrl.description.code, context);
+            paintControl(painter, pos, ctrl, ctrl.description.code.isEmpty() ? ctrl.id : ctrl.description.code, context);
             break;
         }
     }
@@ -422,7 +453,7 @@ void CourseOverlay::paintStart(QPainter* painter, QPointF pos, double rotation_r
     painter->drawPolygon(triangle);
 }
 
-void CourseOverlay::paintControl(QPainter* painter, QPointF pos, const QString& number, const PaintContext& context) const
+void CourseOverlay::paintControl(QPainter* painter, QPointF pos, const CourseControl& ctrl, const QString& number, const PaintContext& context) const
 {
     const qreal lw = mmToViewportPx(line_width_mm, context);
     const qreal r  = mmToViewportPx(circle_diameter_mm / 2.0, context);
@@ -431,7 +462,7 @@ void CourseOverlay::paintControl(QPainter* painter, QPointF pos, const QString& 
     painter->setBrush(Qt::NoBrush);
     painter->drawEllipse(pos, r, r);
 
-    paintControlNumber(painter, pos, number, context);
+    paintControlNumber(painter, pos, ctrl, number, context);
 }
 
 void CourseOverlay::paintFinish(QPainter* painter, QPointF pos, const PaintContext& context) const
@@ -457,13 +488,10 @@ void CourseOverlay::paintCrossingPoint(QPainter* painter, QPointF pos, const Pai
     painter->drawLine(QPointF(pos.x() - r, pos.y() + r), QPointF(pos.x() + r, pos.y() - r));
 }
 
-void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const QString& number, const PaintContext& context) const
+void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const CourseControl& ctrl, const QString& number, const PaintContext& context) const
 {
     if (number.isEmpty())
         return;
-
-    const qreal r      = mmToViewportPx(circle_diameter_mm / 2.0, context);
-    const qreal offset = mmToViewportPx(number_offset_mm, context);
 
     QFont font;
     font.setPixelSize(static_cast<int>(mmToViewportPx(3.0, context)));
@@ -472,8 +500,54 @@ void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const 
 
     painter->setPen(course_purple);
 
-    const QPointF text_pos(center.x() + r + offset * 0.3, center.y() - r - offset * 0.1);
+    const QPointF text_pos = numberTextPosition(center, ctrl, context);
     painter->drawText(text_pos, number);
+    rememberNumberHit(painter, ctrl, number, text_pos, context);
+}
+
+QPointF CourseOverlay::numberOffsetToViewport(const CourseControl& ctrl, const PaintContext& context) const
+{
+    const MapCoordF position(ctrl.position);
+    return toViewport(position + ctrl.number_offset, context) - toViewport(position, context);
+}
+
+QPointF CourseOverlay::numberTextPosition(QPointF center, const CourseControl& ctrl, const PaintContext& context) const
+{
+    const qreal r      = mmToViewportPx(circle_diameter_mm / 2.0, context);
+    const qreal offset = mmToViewportPx(number_offset_mm, context);
+    const QPointF default_pos(center.x() + r + offset * 0.3, center.y() - r - offset * 0.1);
+    return default_pos + numberOffsetToViewport(ctrl, context);
+}
+
+void CourseOverlay::rememberNumberHit(QPainter* painter, const CourseControl& ctrl, const QString& number, QPointF text_pos, const PaintContext& context) const
+{
+    if (!context.interactive || number.isEmpty())
+        return;
+
+    const QFontMetricsF metrics(painter->font());
+    auto bounds = metrics.boundingRect(number).translated(text_pos);
+    bounds.adjust(-4.0, -4.0, 4.0, 4.0);
+    number_hit_cache.push_back(NumberHit { ctrl.id, bounds });
+}
+
+int CourseOverlay::controlIndex(const QString& id) const
+{
+    for (int i = 0; i < db.numControls(); ++i)
+    {
+        if (db.control(i).id == id)
+            return i;
+    }
+    return -1;
+}
+
+const CourseOverlay::NumberHit* CourseOverlay::numberHitAt(const QPoint& pos) const
+{
+    for (int i = number_hit_cache.size() - 1; i >= 0; --i)
+    {
+        if (number_hit_cache[i].bounds.contains(pos))
+            return &number_hit_cache[i];
+    }
+    return nullptr;
 }
 
 
@@ -526,14 +600,14 @@ qreal CourseOverlay::mmToViewportPx(qreal mm, const PaintContext& context) const
 
 bool CourseOverlay::mousePressEvent(QMouseEvent* event)
 {
-    if (!show_description_table || !visible_course)
-        return false;
-    if (event->button() != Qt::LeftButton)
-        return false;
-    if (legend_bounds_cache.isNull())
+    if (!planning_active)
         return false;
 
-    if (legend_resize_handle_cache.contains(event->pos()))
+    if (event->button() != Qt::LeftButton)
+        return false;
+
+    if (show_description_table && visible_course && !legend_bounds_cache.isNull()
+        && legend_resize_handle_cache.contains(event->pos()))
     {
         legend_resizing = true;
         legend_resize_start_bounds = legend_bounds_cache;
@@ -543,22 +617,53 @@ bool CourseOverlay::mousePressEvent(QMouseEvent* event)
         return true;
     }
 
-    if (legend_bounds_cache.contains(event->pos()))
+    if (show_description_table && visible_course && !legend_bounds_cache.isNull()
+        && legend_bounds_cache.contains(event->pos()))
     {
         legend_dragging = true;
         legend_drag_offset = QPointF(event->pos()) - legend_bounds_cache.topLeft();
         widget->setCursor(Qt::ClosedHandCursor);
         return true;
     }
+
+    if (const auto* hit = numberHitAt(event->pos()))
+    {
+        const int index = controlIndex(hit->control_id);
+        if (index < 0)
+            return false;
+
+        number_dragging = true;
+        number_drag_control_id = hit->control_id;
+        number_drag_start_map = widget->viewportToMapF(event->pos());
+        number_drag_start_offset = db.control(index).number_offset;
+        widget->setCursor(Qt::ClosedHandCursor);
+        return true;
+    }
+
     return false;
 }
 
 bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
 {
-    if (!show_description_table || !visible_course)
+    if (!planning_active)
         return false;
 
-    if (legend_resizing)
+    if (number_dragging)
+    {
+        const int index = controlIndex(number_drag_control_id);
+        if (index >= 0)
+        {
+            auto updated = db.control(index);
+            const auto current_map = widget->viewportToMapF(event->pos());
+            updated.number_offset = number_drag_start_offset + (current_map - number_drag_start_map);
+            db.updateControl(index, updated);
+        }
+
+        widget->setCursor(Qt::ClosedHandCursor);
+        return true;
+    }
+
+    if (show_description_table && visible_course && legend_resizing)
     {
         const QPointF base = legend_resize_start_bounds.topLeft();
         const QPointF start_delta = legend_resize_start_bounds.bottomRight() - base;
@@ -578,7 +683,7 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
         return true;
     }
 
-    if (legend_dragging)
+    if (show_description_table && visible_course && legend_dragging)
     {
         const QPointF new_tl = QPointF(event->pos()) - legend_drag_offset;
         legend_anchor = widget->viewportToMapF(new_tl);
@@ -586,23 +691,55 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
         return true;
     }
 
-    if (!legend_resize_handle_cache.isNull() && legend_resize_handle_cache.contains(event->pos()))
+    if (show_description_table && visible_course && !legend_resize_handle_cache.isNull()
+        && legend_resize_handle_cache.contains(event->pos()))
     {
         widget->setCursor(Qt::SizeFDiagCursor);
         return false;
     }
 
     // Hover: change cursor when over legend
-    if (!legend_bounds_cache.isNull() && legend_bounds_cache.contains(event->pos()))
+    if (show_description_table && visible_course && !legend_bounds_cache.isNull()
+        && legend_bounds_cache.contains(event->pos()))
     {
         widget->setCursor(Qt::SizeAllCursor);
         return false;  // don't consume — tool still gets the event
     }
+
+    if (numberHitAt(event->pos()))
+    {
+        widget->setCursor(Qt::OpenHandCursor);
+        return false;
+    }
+
     return false;
 }
 
 bool CourseOverlay::mouseReleaseEvent(QMouseEvent* event)
 {
+    if (!planning_active)
+        return false;
+
+    if (number_dragging && event->button() == Qt::LeftButton)
+    {
+        const int index = controlIndex(number_drag_control_id);
+        if (index >= 0)
+        {
+            const auto new_offset = db.control(index).number_offset;
+            if (new_offset != number_drag_start_offset)
+            {
+                auto* map = widget->getMapView()->getMap();
+                map->push(new MoveControlNumberUndoStep(
+                    map, number_drag_control_id, number_drag_start_offset, new_offset));
+            }
+        }
+
+        number_dragging = false;
+        number_drag_control_id.clear();
+        widget->setCursor(Qt::ArrowCursor);
+        return true;
+    }
+
     if (legend_resizing && event->button() == Qt::LeftButton)
     {
         legend_resizing = false;

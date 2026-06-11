@@ -70,11 +70,12 @@ public:
 		InvalidUndoStepType        = 999,
 
 		// Course planning operations (v1: treated as no-ops when loading from file)
-		CourseControlAddedType     = 100,
-		CourseControlMovedType     = 101,
-		CourseControlRemovedType   = 102,
-		CourseControlDescEditType  = 103,
-		CoursesChangedType         = 104
+		CourseControlAddedType       = 100,
+		CourseControlMovedType       = 101,
+		CourseControlRemovedType     = 102,
+		CourseControlDescEditType    = 103,
+		CoursesChangedType           = 104,
+		CourseControlNumberMovedType = 105
 	};
 	
 	/**

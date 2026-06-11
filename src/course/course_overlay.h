@@ -22,10 +22,13 @@
 
 #include <QJsonObject>
 #include <QObject>
+#include <QPoint>
 #include <QPointF>
 #include <QPolygonF>
 #include <QRectF>
 #include <QSizeF>
+#include <QString>
+#include <QVector>
 
 #include "core/map_coord.h"
 
@@ -62,7 +65,7 @@ class CourseOverlay : public QObject
 
 public:
     /** Creates the overlay and registers it with the given MapWidget. */
-    CourseOverlay(MapWidget* widget, const CourseDatabase& db, QObject* parent = nullptr);
+    CourseOverlay(MapWidget* widget, CourseDatabase& db, QObject* parent = nullptr);
 
     /** Unregisters from the MapWidget. */
     ~CourseOverlay() override;
@@ -79,6 +82,9 @@ public:
     /** Returns the currently visible course (may be nullptr). */
     const Course* visibleCourse() const { return visible_course; }
 
+    /** Shows/hides the interactive course overlay on the map widget. */
+    void setPlanningActive(bool active);
+
     /**
      * Called by MapWidget::paintEvent() to paint the overlay.
      * The painter is in widget (viewport) coordinate space.
@@ -93,7 +99,7 @@ public:
 
     /**
      * Mouse event handlers called by MapWidget before tool dispatch.
-     * Return true if the event was consumed (legend was hit/dragged).
+     * Return true if the event was consumed by a course overlay item.
      */
     bool mousePressEvent(QMouseEvent* event);
     bool mouseMoveEvent(QMouseEvent* event);
@@ -127,6 +133,12 @@ private:
         bool interactive = true;
     };
 
+    struct NumberHit
+    {
+        QString control_id;
+        QRectF bounds;
+    };
+
     void paint(QPainter* painter, const PaintContext& context);
 
     // --- Course / control paint helpers ---
@@ -135,10 +147,15 @@ private:
 
     void paintLeg(QPainter* painter, QPointF from, QPointF to, const PaintContext& context) const;
     void paintStart(QPainter* painter, QPointF pos, double rotation_rad, const PaintContext& context) const;
-    void paintControl(QPainter* painter, QPointF pos, const QString& number, const PaintContext& context) const;
+    void paintControl(QPainter* painter, QPointF pos, const CourseControl& ctrl, const QString& number, const PaintContext& context) const;
     void paintFinish(QPainter* painter, QPointF pos, const PaintContext& context) const;
     void paintCrossingPoint(QPainter* painter, QPointF pos, const PaintContext& context) const;
-    void paintControlNumber(QPainter* painter, QPointF center, const QString& number, const PaintContext& context) const;
+    void paintControlNumber(QPainter* painter, QPointF center, const CourseControl& ctrl, const QString& number, const PaintContext& context) const;
+    QPointF numberOffsetToViewport(const CourseControl& ctrl, const PaintContext& context) const;
+    QPointF numberTextPosition(QPointF center, const CourseControl& ctrl, const PaintContext& context) const;
+    void rememberNumberHit(QPainter* painter, const CourseControl& ctrl, const QString& number, QPointF text_pos, const PaintContext& context) const;
+    int controlIndex(const QString& id) const;
+    const NumberHit* numberHitAt(const QPoint& pos) const;
 
     // --- IOF description table ---
     void paintDescriptionTable(QPainter* painter, const PaintContext& context);
@@ -172,8 +189,9 @@ private:
     static QJsonObject s_custom;
 
     MapWidget* widget;
-    const CourseDatabase& db;
+    CourseDatabase& db;
     const Course* visible_course = nullptr;
+    bool planning_active = false;
 
     bool show_description_table = true;
 
@@ -188,6 +206,13 @@ private:
     double legend_resize_current_scale = 1.0;
     mutable QRectF legend_bounds_cache;  ///< Updated each paint; used for hit-testing
     mutable QRectF legend_resize_handle_cache;
+
+    // --- Control number drag state ---
+    mutable QVector<NumberHit> number_hit_cache;
+    QString number_drag_control_id;
+    MapCoordF number_drag_start_map;
+    MapCoordF number_drag_start_offset;
+    bool number_dragging = false;
 };
 
 

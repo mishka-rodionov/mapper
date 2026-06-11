@@ -48,6 +48,8 @@ static const QLatin1String attr_id           ("id");
 static const QLatin1String attr_type         ("type");
 static const QLatin1String attr_x            ("x");
 static const QLatin1String attr_y            ("y");
+static const QLatin1String attr_number_dx    ("number_dx");
+static const QLatin1String attr_number_dy    ("number_dy");
 static const QLatin1String attr_name         ("name");
 static const QLatin1String attr_control      ("control");
 static const QLatin1String attr_climb        ("climb");
@@ -123,6 +125,11 @@ void saveControl(QXmlStreamWriter& xml, const CourseControl& ctrl)
     elem.writeAttribute(attr_type, controlTypeToString(ctrl.type));
     elem.writeAttribute(attr_x,    ctrl.position.nativeX());
     elem.writeAttribute(attr_y,    ctrl.position.nativeY());
+    if (!qFuzzyIsNull(ctrl.number_offset.x()) || !qFuzzyIsNull(ctrl.number_offset.y()))
+    {
+        elem.writeAttribute(attr_number_dx, ctrl.number_offset.x());
+        elem.writeAttribute(attr_number_dy, ctrl.number_offset.y());
+    }
     saveDescription(xml, ctrl.description);
 }
 
@@ -167,6 +174,12 @@ CourseControl loadControl(QXmlStreamReader& xml)
     auto x = attrs.value(attr_x).toInt();
     auto y = attrs.value(attr_y).toInt();
     ctrl.position = MapCoord::fromNative(x, y);
+    bool dx_ok = false;
+    bool dy_ok = false;
+    const auto dx = attrs.value(attr_number_dx).toDouble(&dx_ok);
+    const auto dy = attrs.value(attr_number_dy).toDouble(&dy_ok);
+    if (dx_ok && dy_ok)
+        ctrl.number_offset = MapCoordF(dx, dy);
 
     while (xml.readNextStartElement())
     {

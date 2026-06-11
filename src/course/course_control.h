@@ -67,6 +67,7 @@ struct CourseControl
 {
     QString      id;                            ///< Unique identifier within the database
     MapCoord     position;                      ///< Position in native map coordinates (1/1000 mm)
+    MapCoordF    number_offset;                 ///< Additional number label offset in native map coordinates (1/1000 mm)
     ControlType  type = ControlType::Regular;   ///< Role of the control
     ControlDescription description;            ///< IOF control description
 
