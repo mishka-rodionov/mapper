@@ -124,6 +124,20 @@ QString CourseDatabase::generateUniqueId(ControlType type) const
 }
 
 
+// --- Legend anchor ---
+
+void CourseDatabase::setLegendAnchor(const MapCoordF& anchor)
+{
+    legend_anchor = anchor;
+    legend_anchor_valid = true;
+}
+
+void CourseDatabase::clearLegendAnchor()
+{
+    legend_anchor_valid = false;
+}
+
+
 // --- Courses ---
 
 int CourseDatabase::addCourse(Course c)

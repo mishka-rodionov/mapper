@@ -25,6 +25,7 @@
 #include <QObject>
 #include <QString>
 
+#include "core/map_coord.h"
 #include "course/course.h"
 #include "course/course_control.h"
 
@@ -103,6 +104,14 @@ public:
     void removeCourse(int index);
 
 
+    // --- Legend anchor ---
+
+    bool hasLegendAnchor() const { return legend_anchor_valid; }
+    MapCoordF legendAnchor() const { return legend_anchor; }
+    void setLegendAnchor(const MapCoordF& anchor);
+    void clearLegendAnchor();
+
+
 signals:
     void eventNameChanged();
     void controlAdded(int index);
@@ -116,6 +125,8 @@ private:
     QString event_name;
     std::vector<CourseControl> controls;
     std::vector<Course> courses;
+    MapCoordF legend_anchor;
+    bool legend_anchor_valid = false;
 };
 
 

@@ -494,7 +494,7 @@ void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const 
         return;
 
     QFont font;
-    font.setPixelSize(static_cast<int>(mmToViewportPx(3.0, context)));
+    font.setPixelSize(static_cast<int>(mmToViewportPx(3.45, context)));
     font.setBold(true);
     painter->setFont(font);
 
@@ -751,6 +751,7 @@ bool CourseOverlay::mouseReleaseEvent(QMouseEvent* event)
     if (legend_dragging && event->button() == Qt::LeftButton)
     {
         legend_dragging = false;
+        db.setLegendAnchor(legend_anchor);
         widget->setCursor(Qt::ArrowCursor);
         return true;
     }
@@ -911,13 +912,20 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
                        + row_h * rows.size()
                        + (has_finish ? row_h : 0);
 
-    // Initialize anchor (default: bottom-left of widget)
+    // Initialize anchor: restore saved position from db, or default to bottom-left
     if (!legend_anchor_initialized)
     {
-        const int margin = static_cast<int>(mmToViewportPx(5.0, context));
-        const auto size = viewportSize(context);
-        const QPointF default_tl(margin, size.height() - total_h - margin);
-        legend_anchor = viewportToMap(default_tl, context);
+        if (db.hasLegendAnchor())
+        {
+            legend_anchor = db.legendAnchor();
+        }
+        else
+        {
+            const int margin = static_cast<int>(mmToViewportPx(5.0, context));
+            const auto size = viewportSize(context);
+            const QPointF default_tl(margin, size.height() - total_h - margin);
+            legend_anchor = viewportToMap(default_tl, context);
+        }
         legend_anchor_initialized = true;
     }
 
@@ -993,7 +1001,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
     }
 
     // Separator between header and data rows
-    painter->setPen(QPen(course_purple, 1));
+    painter->setPen(QPen(course_purple, 1.5));
     painter->drawLine(x0, y0 + header_h, x0 + total_w, y0 + header_h);
 
     // Column grid lines (only over data rows, not header)
@@ -1005,7 +1013,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
     // ── Start row ────────────────────────────────────────────────────
     if (has_start)
     {
-        painter->setPen(QPen(QColor(200, 200, 200), 1));
+        painter->setPen(QPen(QColor(200, 200, 200), 1.5));
         painter->drawLine(x0, current_y, x0 + total_w, current_y);
 
         const QRectF start_cell(x0, current_y, cell, row_h);
@@ -1016,14 +1024,17 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
     // ── Regular control rows ─────────────────────────────────────────
     QFont df;
     df.setPixelSize(std::max(7, static_cast<int>(cell_px * 0.40)));
-    painter->setFont(df);
+
+    QFont df_id;
+    df_id.setPixelSize(std::max(8, static_cast<int>(cell_px * 0.48)));
+    df_id.setBold(true);
 
     for (int i = 0; i < rows.size(); ++i)
     {
         const auto& r = rows[i];
         const int ry = current_y;
 
-        painter->setPen(QPen(QColor(180, 180, 180), 1));
+        painter->setPen(QPen(QColor(180, 180, 180), 1.5));
         painter->drawLine(x0, ry, x0 + total_w, ry);
 
         const QString cells[NCOLS] = {
@@ -1033,15 +1044,17 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
         for (int c = 0; c < NCOLS; ++c)
         {
             painter->setPen(Qt::black);
+            painter->setFont(c < 2 ? df_id : df);
             paintISCDCell(painter, cells[c], QRectF(x0 + c * cell, ry, cell, row_h), c);
         }
         current_y += row_h;
     }
+    painter->setFont(df);
 
     // ── Finish row ───────────────────────────────────────────────────
     if (has_finish)
     {
-        painter->setPen(QPen(QColor(200, 200, 200), 1));
+        painter->setPen(QPen(QColor(200, 200, 200), 1.5));
         painter->drawLine(x0, current_y, x0 + total_w, current_y);
 
         const QRectF finish_cell(x0, current_y, cell, row_h);

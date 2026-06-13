@@ -24,10 +24,10 @@
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
+#include "core/map_coord.h"
 #include "course/course.h"
 #include "course/course_control.h"
 #include "course/course_database.h"
-#include "core/map_coord.h"
 #include "util/xml_stream_util.h"
 
 
@@ -54,6 +54,8 @@ static const QLatin1String attr_name         ("name");
 static const QLatin1String attr_control      ("control");
 static const QLatin1String attr_climb        ("climb");
 static const QLatin1String attr_description_scale("description_scale");
+static const QLatin1String attr_legend_x         ("legend_x");
+static const QLatin1String attr_legend_y         ("legend_y");
 
 // ControlDescription attributes
 static const QLatin1String attr_code         ("code");
@@ -231,6 +233,11 @@ void save(QXmlStreamWriter& xml, const CourseDatabase& db)
     courses_elem.writeAttribute(attr_version, current_courses_version);
     if (!db.eventName().isEmpty())
         courses_elem.writeAttribute(attr_event, db.eventName());
+    if (db.hasLegendAnchor())
+    {
+        courses_elem.writeAttribute(attr_legend_x, db.legendAnchor().x());
+        courses_elem.writeAttribute(attr_legend_y, db.legendAnchor().y());
+    }
 
     for (int i = 0; i < db.numControls(); ++i)
         saveControl(xml, db.control(i));
@@ -245,6 +252,14 @@ void load(QXmlStreamReader& xml, CourseDatabase& db)
     // Caller has positioned reader at the <courses> start element.
     const auto attrs = xml.attributes();
     db.setEventName(attrs.value(attr_event).toString());
+
+    bool lx_ok = false, ly_ok = false;
+    const double lx = attrs.value(attr_legend_x).toDouble(&lx_ok);
+    const double ly = attrs.value(attr_legend_y).toDouble(&ly_ok);
+    if (lx_ok && ly_ok)
+        db.setLegendAnchor(MapCoordF(lx, ly));
+    else
+        db.clearLegendAnchor();
 
     while (xml.readNextStartElement())
     {
