@@ -87,6 +87,9 @@ Per the project memory: don't manually UI-test Mapper — just build with ninja 
 - Headers use IWYU pragma annotations; keep includes minimal.
 - Test files follow the naming `<name>_t.{cpp,h}` (system tests) or `tst_<name>.{cpp,h}` (unit tests).
 
+## Commands
+- Always use rtk for commands (rtk grep, rtk find, rtk git, and etc.)
+
 ## Межпроектные связи
 
 Этот проект — часть экосистемы из четырёх репозиториев:
