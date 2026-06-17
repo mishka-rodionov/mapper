@@ -86,3 +86,24 @@ Per the project memory: don't manually UI-test Mapper — just build with ninja 
 - All classes are in the `OpenOrienteering` namespace.
 - Headers use IWYU pragma annotations; keep includes minimal.
 - Test files follow the naming `<name>_t.{cpp,h}` (system tests) or `tst_<name>.{cpp,h}` (unit tests).
+
+## Межпроектные связи
+
+Этот проект — часть экосистемы из четырёх репозиториев:
+
+| Проект | Путь | Роль |
+|---|---|---|
+| **eSport** (backend) | `/Users/rodionov/backend_projects/eSport` | Ktor-сервер, парсит IOF XML, загруженный клиентами |
+| **competra-android** | `/Users/rodionov/android_projects/competra-android` | Android-клиент, загружает IOF XML на сервер |
+| **competra-web** | `/Users/rodionov/web_projects/competra-web` | Веб-клиент, загружает IOF XML на сервер |
+
+### Правила для Claude
+
+**При изменении формата IOF XML-экспорта** (файлы в `src/fileformats/iof_course_export*.cpp`, `kml_course_export.cpp`) — **спроси пользователя**: не сломает ли это парсер `IOFXmlParser.kt` в eSport? Именно этот файл разбирает экспортированные Mapper'ом курсы.
+
+### Цепочка использования
+1. Пользователь создаёт дистанции в Mapper и экспортирует их в IOF XML
+2. Файл загружается через `POST /event/orienteering/import/courses` — либо с Android (`DistanceRepository.importFromXml` в `:data:remote`), либо через Web (`shared/data/repository/DistanceRepository.importFromXml`)
+3. eSport парсит файл через `data/util/IOFXmlParser.kt` и сохраняет дистанции в БД
+
+Mapper сам по себе не обращается к API eSport — связь только через файловый формат IOF XML.
