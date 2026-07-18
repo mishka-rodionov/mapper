@@ -19,18 +19,24 @@
 
 #include "course_panel.h"
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
 #include <QButtonGroup>
+#include <QComboBox>
 #include <QHBoxLayout>
 #include <QInputDialog>
+#include <QItemSelection>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QStringList>
 #include <QTabWidget>
 #include <QToolButton>
 #include <QTreeWidget>
@@ -76,6 +82,29 @@ int descriptionScaleToPercent(double scale)
 {
     return static_cast<int>(boundedDescriptionScale(scale) * 100.0 + 0.5);
 }
+
+/**
+ * A plain click toggles the clicked row's selection instead of replacing it,
+ * so several controls can be picked one-by-one without holding Ctrl.
+ * Shift+click still selects a contiguous range as usual.
+ */
+class ToggleSelectionTreeWidget : public QTreeWidget
+{
+public:
+    using QTreeWidget::QTreeWidget;
+
+protected:
+    QItemSelectionModel::SelectionFlags selectionCommand(const QModelIndex& index,
+                                                          const QEvent* event) const override
+    {
+        if (event && event->type() == QEvent::MouseButtonPress
+            && !(static_cast<const QMouseEvent*>(event)->modifiers() & Qt::ShiftModifier))
+        {
+            return QItemSelectionModel::Toggle | QItemSelectionModel::Rows;
+        }
+        return QTreeWidget::selectionCommand(index, event);
+    }
+};
 
 }  // anonymous namespace
 
@@ -135,24 +164,47 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         type_row->addWidget(type_btn_finish);
         type_row->addWidget(type_btn_crossing);
 
-        controls_tree = new QTreeWidget;
+        controls_tree = new ToggleSelectionTreeWidget;
         controls_tree->setColumnCount(2);
         controls_tree->setHeaderLabels({tr("Code"), tr("Type")});
         controls_tree->setContextMenuPolicy(Qt::CustomContextMenu);
         controls_tree->setRootIsDecorated(false);
         controls_tree->setSelectionBehavior(QAbstractItemView::SelectRows);
-        controls_tree->setSelectionMode(QAbstractItemView::MultiSelection);
+        controls_tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
         connect(controls_tree, &QTreeWidget::itemClicked,
                 this, &CoursePanelWidget::onControlItemClicked);
         connect(controls_tree, &QTreeWidget::customContextMenuRequested,
                 this, &CoursePanelWidget::onControlContextMenu);
+        connect(controls_tree->selectionModel(), &QItemSelectionModel::selectionChanged,
+                this, &CoursePanelWidget::onControlSelectionModelChanged);
+
+        selection_summary_label = new QLabel(tr("No controls selected"));
+        selection_summary_label->setWordWrap(true);
+
+        course_target_combo = new QComboBox;
+        add_to_course_from_controls_btn = new QPushButton(tr("Add"));
+        add_to_course_from_controls_btn->setToolTip(
+            tr("Add all selected controls (Start/Finish/Regular/Crossing) to the chosen course"));
+        add_to_course_from_controls_btn->setEnabled(false);
+
+        connect(course_target_combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &CoursePanelWidget::onCourseTargetComboChanged);
+        connect(add_to_course_from_controls_btn, &QPushButton::clicked,
+                this, &CoursePanelWidget::addSelectedControlToCourse);
+
+        auto* add_to_course_row = new QHBoxLayout;
+        add_to_course_row->addWidget(new QLabel(tr("Add to course:")));
+        add_to_course_row->addWidget(course_target_combo, 1);
+        add_to_course_row->addWidget(add_to_course_from_controls_btn);
 
         properties_widget = new ControlPropertiesWidget(map, db);
 
         auto* layout = new QVBoxLayout;
         layout->addLayout(type_row);
         layout->addWidget(controls_tree, 1);
+        layout->addWidget(selection_summary_label);
+        layout->addLayout(add_to_course_row);
         layout->addWidget(properties_widget);
         layout->setContentsMargins(4, 4, 4, 4);
         auto* tab = new QWidget;
@@ -319,6 +371,7 @@ void CoursePanelWidget::rebuildControlsTree()
     if (rebuilding) return;
     rebuilding = true;
 
+    selected_control_order.clear();
     controls_tree->clear();
     for (int i = 0; i < db.numControls(); ++i)
     {
@@ -334,6 +387,7 @@ void CoursePanelWidget::rebuildControlsTree()
     controls_tree->resizeColumnToContents(0);
 
     rebuilding = false;
+    updateSelectionSummary();
 }
 
 void CoursePanelWidget::onControlItemClicked(QTreeWidgetItem* item, int /*column*/)
@@ -375,6 +429,61 @@ void CoursePanelWidget::deleteSelectedControl()
     }
 }
 
+void CoursePanelWidget::updateSelectionSummary()
+{
+    const auto ids = selectedControlIds();
+    if (ids.empty())
+    {
+        selection_summary_label->setText(tr("No controls selected"));
+        add_to_course_from_controls_btn->setEnabled(false);
+        return;
+    }
+
+    QStringList labels;
+    labels.reserve(int(ids.size()));
+    for (const auto& id : ids)
+    {
+        const auto* ctrl = db.findById(id);
+        labels << ((ctrl && !ctrl->description.code.isEmpty()) ? ctrl->description.code : id);
+    }
+    selection_summary_label->setText(
+        tr("Selected (%1): %2").arg(labels.size()).arg(labels.join(QLatin1String(", "))));
+    add_to_course_from_controls_btn->setEnabled(course_target_combo->count() > 0);
+}
+
+void CoursePanelWidget::onControlSelectionModelChanged(const QItemSelection& selected,
+                                                        const QItemSelection& deselected)
+{
+    for (const auto& index : deselected.indexes())
+    {
+        if (index.column() != 0) continue;
+        auto* item = controls_tree->topLevelItem(index.row());
+        if (!item) continue;
+        const QString id = item->data(0, Qt::UserRole).toString();
+        selected_control_order.erase(
+            std::remove(selected_control_order.begin(), selected_control_order.end(), id),
+            selected_control_order.end());
+    }
+    for (const auto& index : selected.indexes())
+    {
+        if (index.column() != 0) continue;
+        auto* item = controls_tree->topLevelItem(index.row());
+        if (!item) continue;
+        const QString id = item->data(0, Qt::UserRole).toString();
+        if (std::find(selected_control_order.begin(), selected_control_order.end(), id)
+            == selected_control_order.end())
+            selected_control_order.push_back(id);
+    }
+    updateSelectionSummary();
+}
+
+void CoursePanelWidget::onCourseTargetComboChanged(int index)
+{
+    if (rebuilding) return;
+    if (index == courses_list->currentRow()) return;
+    courses_list->setCurrentRow(index);
+}
+
 
 // ── Courses tab ───────────────────────────────────────────────────────────────
 
@@ -385,16 +494,24 @@ void CoursePanelWidget::rebuildCoursesList()
 
     const int prev_row = courses_list->currentRow();
     courses_list->clear();
+    course_target_combo->clear();
     for (int i = 0; i < db.numCourses(); ++i)
+    {
         courses_list->addItem(db.course(i).name);
+        course_target_combo->addItem(db.course(i).name);
+    }
 
     // Restore selection if still valid
     if (prev_row >= 0 && prev_row < courses_list->count())
+    {
         courses_list->setCurrentRow(prev_row);
+        course_target_combo->setCurrentIndex(prev_row);
+    }
 
     rebuilding = false;
 
     rebuildEntriesList();
+    updateSelectionSummary();
 
     // Update overlay
     if (overlay)
@@ -437,6 +554,8 @@ void CoursePanelWidget::onCourseSelectionChanged()
 
     // Update climb spinbox
     rebuilding = true;
+    if (course_target_combo->currentIndex() != idx)
+        course_target_combo->setCurrentIndex(idx);
     climb_spinbox->setEnabled(idx >= 0);
     climb_label->setEnabled(idx >= 0);
     legend_scale_spinbox->setEnabled(idx >= 0);
@@ -648,15 +767,7 @@ std::vector<Course> CoursePanelWidget::coursesSnapshot() const
 
 std::vector<QString> CoursePanelWidget::selectedControlIds() const
 {
-    std::vector<QString> ids;
-    ids.reserve(std::size_t(controls_tree->selectedItems().size()));
-    for (int i = 0; i < controls_tree->topLevelItemCount(); ++i)
-    {
-        const auto* item = controls_tree->topLevelItem(i);
-        if (item->isSelected())
-            ids.push_back(item->data(0, Qt::UserRole).toString());
-    }
-    return ids;
+    return selected_control_order;
 }
 
 int CoursePanelWidget::selectedCourseIndex() const

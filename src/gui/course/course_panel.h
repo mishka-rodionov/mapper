@@ -29,6 +29,7 @@
 #include "course/course_control.h"
 
 class QButtonGroup;
+class QComboBox;
 class QLabel;
 class QListWidget;
 class QPushButton;
@@ -37,6 +38,7 @@ class QTabWidget;
 class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
+class QItemSelection;
 
 namespace OpenOrienteering {
 
@@ -85,6 +87,9 @@ private slots:
     void onControlItemClicked(QTreeWidgetItem* item, int column);
     void onControlContextMenu(const QPoint& pos);
     void deleteSelectedControl();
+    void updateSelectionSummary();
+    void onControlSelectionModelChanged(const QItemSelection& selected, const QItemSelection& deselected);
+    void onCourseTargetComboChanged(int index);
 
     // Courses tab actions
     void addCourse();
@@ -105,7 +110,7 @@ private:
     /** Captures a snapshot of all courses for an undo step. */
     std::vector<Course> coursesSnapshot() const;
 
-    /** Returns selected control ids in their current list order. */
+    /** Returns selected control ids in the order they were selected (click order). */
     std::vector<QString> selectedControlIds() const;
 
     /** Pushes CoursesChangedUndoStep then commits the new courses. */
@@ -128,6 +133,9 @@ private:
     QToolButton*  type_btn_crossing = nullptr;
 
     QTreeWidget*              controls_tree     = nullptr;
+    QLabel*                   selection_summary_label = nullptr;
+    QComboBox*                course_target_combo = nullptr;
+    QPushButton*              add_to_course_from_controls_btn = nullptr;
     ControlPropertiesWidget*  properties_widget = nullptr;
 
     // Courses tab
@@ -151,6 +159,7 @@ private:
     bool legend_scale_drag_active = false;
 
     QString selected_control_id;  ///< Currently highlighted control
+    std::vector<QString> selected_control_order;  ///< Multi-selection, in click order
     bool rebuilding = false;       ///< Guard against recursive rebuild
 };
 
