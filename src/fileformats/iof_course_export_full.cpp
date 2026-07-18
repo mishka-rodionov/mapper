@@ -19,6 +19,8 @@
 
 #include "iof_course_export_full.h"
 
+#include <cmath>
+
 #include <Qt>
 #include <QDateTime>
 #include <QLatin1String>
@@ -156,6 +158,29 @@ void IofCourseExportFull::writeCourse(const Course& course, const CourseDatabase
 {
     XmlElementWriter course_elem(*xml, QLatin1String("Course"));
     xml->writeTextElement(QLatin1String("Name"), course.name);
+
+    {
+        double total_mm = 0.0;
+        const CourseControl* prev = nullptr;
+        for (const auto& entry : course.entries)
+        {
+            const auto* ctrl = db.findById(entry.control_id);
+            if (ctrl && prev)
+            {
+                const MapCoordF p1(prev->position), p2(ctrl->position);
+                const double dx = p1.x() - p2.x(), dy = p1.y() - p2.y();
+                total_mm += std::sqrt(dx * dx + dy * dy);
+            }
+            if (ctrl) prev = ctrl;
+        }
+        const int length_m = static_cast<int>(
+            total_mm * map->getScaleDenominator() / 1000.0 + 0.5);
+        if (length_m > 0)
+            xml->writeTextElement(QLatin1String("Length"), QString::number(length_m));
+    }
+
+    if (course.climb_m > 0)
+        xml->writeTextElement(QLatin1String("Climb"), QString::number(course.climb_m));
 
     for (const auto& entry : course.entries)
     {
