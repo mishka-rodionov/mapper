@@ -41,8 +41,12 @@ enum class CourseType
 struct CourseEntry
 {
     QString control_id;  ///< Matches CourseControl::id in the CourseDatabase
+    int points = 0;      ///< Score awarded for this control (Score courses only)
 
-    bool operator==(const CourseEntry& other) const noexcept { return control_id == other.control_id; }
+    bool operator==(const CourseEntry& other) const noexcept
+    {
+        return control_id == other.control_id && points == other.points;
+    }
     bool operator!=(const CourseEntry& other) const noexcept { return !(*this == other); }
 };
 
@@ -59,6 +63,7 @@ struct Course
     std::vector<CourseEntry> entries;  ///< Ordered [Start, controls..., Finish]
     int climb_m = 0;                   ///< Climb in meters (entered manually)
     double description_scale = 1.0;     ///< Scale factor for the on-map legend.
+    int default_points = 2;             ///< Default score for newly added entries (Score courses only)
 
     bool operator==(const Course& other) const noexcept;
     bool operator!=(const Course& other) const noexcept { return !(*this == other); }

@@ -96,6 +96,8 @@ private slots:
     void renameCourse();
     void removeCourse();
     void onCourseSelectionChanged();
+    void onCourseTypeComboChanged(int index);
+    void onDefaultPointsValueChanged(int value);
 
     // Entries tab actions
     void addSelectedControlToCourse();
@@ -105,6 +107,8 @@ private slots:
     void removeEntryFromCourse();
     void moveEntryUp();
     void moveEntryDown();
+    void onEntriesSelectionChanged();
+    void onEntryPointsValueChanged(int value);
 
 private:
     /** Captures a snapshot of all courses for an undo step. */
@@ -149,11 +153,16 @@ private:
     QPushButton*  remove_entry_btn = nullptr;
     QPushButton*  entry_up_btn    = nullptr;
     QPushButton*  entry_down_btn  = nullptr;
+    QLabel*       entry_points_label   = nullptr;
+    QSpinBox*     entry_points_spinbox = nullptr;
 
+    QComboBox*    course_type_combo    = nullptr;
     QLabel*       climb_label     = nullptr;
     QSpinBox*     climb_spinbox   = nullptr;
     QLabel*       legend_scale_label   = nullptr;
     QSpinBox*     legend_scale_spinbox = nullptr;
+    QLabel*       default_points_label   = nullptr;
+    QSpinBox*     default_points_spinbox = nullptr;
 
     std::vector<Course> legend_scale_drag_before;
     bool legend_scale_drag_active = false;

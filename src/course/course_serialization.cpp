@@ -53,6 +53,8 @@ static const QLatin1String attr_number_dy    ("number_dy");
 static const QLatin1String attr_name         ("name");
 static const QLatin1String attr_control      ("control");
 static const QLatin1String attr_climb        ("climb");
+static const QLatin1String attr_points       ("points");
+static const QLatin1String attr_default_points("default_points");
 static const QLatin1String attr_description_scale("description_scale");
 static const QLatin1String attr_legend_x         ("legend_x");
 static const QLatin1String attr_legend_y         ("legend_y");
@@ -144,10 +146,14 @@ void saveCourse(QXmlStreamWriter& xml, const Course& c)
         elem.writeAttribute(attr_climb, c.climb_m);
     if (c.description_scale != 1.0)
         elem.writeAttribute(attr_description_scale, c.description_scale);
+    if (c.type == CourseType::Score)
+        elem.writeAttribute(attr_default_points, c.default_points);
     for (const auto& entry : c.entries)
     {
         XmlElementWriter entry_elem(xml, tag_entry);
         entry_elem.writeAttribute(attr_control, entry.control_id);
+        if (c.type == CourseType::Score)
+            entry_elem.writeAttribute(attr_points, entry.points);
     }
 }
 
@@ -204,6 +210,10 @@ Course loadCourse(QXmlStreamReader& xml)
     const double scale = attrs.value(attr_description_scale).toDouble(&scale_ok);
     if (scale_ok && scale > 0.0)
         c.description_scale = qBound(min_description_scale, scale, max_description_scale);
+    bool dp_ok = false;
+    const int default_points = attrs.value(attr_default_points).toInt(&dp_ok);
+    if (dp_ok && default_points > 0)
+        c.default_points = default_points;
 
     while (xml.readNextStartElement())
     {
@@ -211,6 +221,7 @@ Course loadCourse(QXmlStreamReader& xml)
         {
             CourseEntry entry;
             entry.control_id = xml.attributes().value(attr_control).toString();
+            entry.points     = xml.attributes().value(attr_points).toInt();
             c.entries.push_back(std::move(entry));
             xml.skipCurrentElement();
         }

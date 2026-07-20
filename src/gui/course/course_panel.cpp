@@ -236,6 +236,22 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         course_btns->addStretch();
         course_btns->addWidget(remove_course_btn);
 
+        // Course type: Linear (fixed order) vs Score (choice, points per control)
+        course_type_combo = new QComboBox;
+        course_type_combo->addItem(tr("Linear (fixed order)"), static_cast<int>(CourseType::Linear));
+        course_type_combo->addItem(tr("Score (choice)"), static_cast<int>(CourseType::Score));
+        course_type_combo->setToolTip(
+            tr("Linear: controls must be visited in the listed order.\n"
+               "Score: controls may be taken in any order, each worth points."));
+        course_type_combo->setEnabled(false);
+
+        connect(course_type_combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &CoursePanelWidget::onCourseTypeComboChanged);
+
+        auto* course_type_row = new QHBoxLayout;
+        course_type_row->addWidget(new QLabel(tr("Type:")));
+        course_type_row->addWidget(course_type_combo, 1);
+
         // Entries sub-section
         entries_list = new QListWidget;
         entries_list->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -258,6 +274,24 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         entry_btns->addStretch();
         entry_btns->addWidget(entry_up_btn);
         entry_btns->addWidget(entry_down_btn);
+
+        // Points for the selected entry (Score courses only)
+        entry_points_label   = new QLabel(tr("Points:"));
+        entry_points_spinbox = new QSpinBox;
+        entry_points_spinbox->setRange(0, 999);
+        entry_points_spinbox->setSuffix(tr(" pts"));
+        entry_points_spinbox->setToolTip(tr("Score awarded for taking this control (Score courses only)"));
+        entry_points_spinbox->setEnabled(false);
+        entry_points_label->setEnabled(false);
+
+        connect(entries_list, &QListWidget::currentRowChanged,
+                this, &CoursePanelWidget::onEntriesSelectionChanged);
+        connect(entry_points_spinbox, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &CoursePanelWidget::onEntryPointsValueChanged);
+
+        auto* entry_points_row = new QHBoxLayout;
+        entry_points_row->addWidget(entry_points_label);
+        entry_points_row->addWidget(entry_points_spinbox, 1);
 
         // Climb (manual entry)
         climb_label   = new QLabel(tr("Climb:"));
@@ -291,15 +325,34 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         legend_scale_row->addWidget(legend_scale_label);
         legend_scale_row->addWidget(legend_scale_spinbox, 1);
 
+        default_points_label   = new QLabel(tr("Default points:"));
+        default_points_spinbox = new QSpinBox;
+        default_points_spinbox->setRange(1, 999);
+        default_points_spinbox->setSuffix(tr(" pts"));
+        default_points_spinbox->setToolTip(
+            tr("Score assigned automatically to newly added controls in this course"));
+        default_points_spinbox->setEnabled(false);
+        default_points_label->setEnabled(false);
+
+        connect(default_points_spinbox, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &CoursePanelWidget::onDefaultPointsValueChanged);
+
+        auto* default_points_row = new QHBoxLayout;
+        default_points_row->addWidget(default_points_label);
+        default_points_row->addWidget(default_points_spinbox, 1);
+
         auto* layout = new QVBoxLayout;
         layout->addWidget(new QLabel(tr("Courses:")));
         layout->addWidget(courses_list, 2);
         layout->addLayout(course_btns);
+        layout->addLayout(course_type_row);
         layout->addLayout(climb_row);
         layout->addLayout(legend_scale_row);
+        layout->addLayout(default_points_row);
         layout->addWidget(new QLabel(tr("Entries:")));
         layout->addWidget(entries_list, 3);
         layout->addLayout(entry_btns);
+        layout->addLayout(entry_points_row);
         layout->setContentsMargins(4, 4, 4, 4);
         auto* tab = new QWidget;
         tab->setLayout(layout);
@@ -540,6 +593,8 @@ void CoursePanelWidget::rebuildEntriesList()
                 label = ctrl->description.code;
             label += QLatin1String(" (") + controlTypeLabel(ctrl->type) + QLatin1Char(')');
         }
+        if (course.type == CourseType::Score)
+            label += QLatin1String(" - ") + tr("%1 pts").arg(entry.points);
         auto* item = new QListWidgetItem(label);
         item->setData(Qt::UserRole, entry.control_id);
         entries_list->addItem(item);
@@ -560,10 +615,19 @@ void CoursePanelWidget::onCourseSelectionChanged()
     climb_label->setEnabled(idx >= 0);
     legend_scale_spinbox->setEnabled(idx >= 0);
     legend_scale_label->setEnabled(idx >= 0);
+    course_type_combo->setEnabled(idx >= 0);
+    const bool is_score = idx >= 0 && db.course(idx).type == CourseType::Score;
+    default_points_spinbox->setEnabled(is_score);
+    default_points_label->setEnabled(is_score);
     if (idx >= 0)
     {
-        climb_spinbox->setValue(db.course(idx).climb_m);
-        legend_scale_spinbox->setValue(descriptionScaleToPercent(db.course(idx).description_scale));
+        const auto& c = db.course(idx);
+        climb_spinbox->setValue(c.climb_m);
+        legend_scale_spinbox->setValue(descriptionScaleToPercent(c.description_scale));
+        default_points_spinbox->setValue(c.default_points);
+        const int type_index = course_type_combo->findData(static_cast<int>(c.type));
+        if (type_index >= 0 && course_type_combo->currentIndex() != type_index)
+            course_type_combo->setCurrentIndex(type_index);
     }
     else
     {
@@ -676,6 +740,50 @@ void CoursePanelWidget::renameCourse()
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
 }
 
+void CoursePanelWidget::onCourseTypeComboChanged(int index)
+{
+    const int idx = selectedCourseIndex();
+    if (idx < 0 || rebuilding) return;
+
+    const auto new_type = static_cast<CourseType>(course_type_combo->itemData(index).toInt());
+    auto updated = db.course(idx);
+    if (updated.type == new_type) return;
+
+    auto snapshot = coursesSnapshot();
+    updated.type = new_type;
+    if (new_type == CourseType::Score)
+    {
+        // Entries that never had points assigned (e.g. added while the course
+        // was still Linear) default to the course's default score instead of
+        // silently being worth 0.
+        for (auto& entry : updated.entries)
+            if (entry.points == 0)
+                entry.points = updated.default_points;
+    }
+    db.updateCourse(idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+}
+
+void CoursePanelWidget::onDefaultPointsValueChanged(int value)
+{
+    const int idx = selectedCourseIndex();
+    if (idx < 0 || rebuilding) return;
+
+    auto updated = db.course(idx);
+    const int old_default = updated.default_points;
+    if (old_default == value) return;
+
+    auto snapshot = coursesSnapshot();
+    updated.default_points = value;
+    // Entries still following the default (i.e. never overridden individually)
+    // move to the new default along with it.
+    for (auto& entry : updated.entries)
+        if (entry.points == old_default)
+            entry.points = value;
+    db.updateCourse(idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+}
+
 void CoursePanelWidget::removeCourse()
 {
     const int idx = selectedCourseIndex();
@@ -700,9 +808,43 @@ void CoursePanelWidget::addSelectedControlToCourse()
     {
         CourseEntry entry;
         entry.control_id = control_id;
+        if (updated.type == CourseType::Score)
+            entry.points = updated.default_points;
         updated.entries.push_back(std::move(entry));
     }
     db.updateCourse(idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+}
+
+void CoursePanelWidget::onEntriesSelectionChanged()
+{
+    const int course_idx = selectedCourseIndex();
+    const int entry_idx  = entries_list->currentRow();
+    const bool show = course_idx >= 0 && entry_idx >= 0
+                    && db.course(course_idx).type == CourseType::Score;
+
+    rebuilding = true;
+    entry_points_spinbox->setEnabled(show);
+    entry_points_label->setEnabled(show);
+    if (show)
+        entry_points_spinbox->setValue(db.course(course_idx).entries[std::size_t(entry_idx)].points);
+    rebuilding = false;
+}
+
+void CoursePanelWidget::onEntryPointsValueChanged(int value)
+{
+    if (rebuilding) return;
+    const int course_idx = selectedCourseIndex();
+    const int entry_idx  = entries_list->currentRow();
+    if (course_idx < 0 || entry_idx < 0) return;
+
+    auto updated = db.course(course_idx);
+    if (entry_idx >= static_cast<int>(updated.entries.size())) return;
+    if (updated.entries[std::size_t(entry_idx)].points == value) return;
+
+    auto snapshot = coursesSnapshot();
+    updated.entries[std::size_t(entry_idx)].points = value;
+    db.updateCourse(course_idx, std::move(updated));
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
 }
 

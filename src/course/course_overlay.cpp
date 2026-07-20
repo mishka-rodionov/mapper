@@ -342,8 +342,11 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course, const P
             resolved.append(ctrl);
     }
 
-    for (int i = 1; i < resolved.size(); ++i)
-        paintLeg(painter, toViewport(*resolved[i-1], context), toViewport(*resolved[i], context), context);
+    if (course.type == CourseType::Linear)
+    {
+        for (int i = 1; i < resolved.size(); ++i)
+            paintLeg(painter, toViewport(*resolved[i-1], context), toViewport(*resolved[i], context), context);
+    }
 
     int seq = 1;
     for (int i = 0; i < resolved.size(); ++i)
@@ -372,9 +375,14 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course, const P
             paintCrossingPoint(painter, pos, context);
             break;
         default:
-            paintControl(painter, pos, *ctrl, QString::number(seq), context);
+        {
+            const QString label = (course.type == CourseType::Score)
+                ? (ctrl->description.code.isEmpty() ? ctrl->id : ctrl->description.code)
+                : QString::number(seq);
+            paintControl(painter, pos, *ctrl, label, context);
             ++seq;
             break;
+        }
         }
     }
 }
@@ -847,6 +855,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
 
     struct Row {
         int     seq;
+        int     points;
         QString code;
         QString part;
         QString feature;
@@ -878,6 +887,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
         {
             Row r;
             r.seq      = seq++;
+            r.points   = entry.points;
             r.code     = ctrl->description.code.isEmpty() ? ctrl->id : ctrl->description.code;
             r.part     = ctrl->description.feature_part;
             r.feature  = ctrl->description.feature;
@@ -1038,7 +1048,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
         painter->drawLine(x0, ry, x0 + total_w, ry);
 
         const QString cells[NCOLS] = {
-            QString::number(r.seq),
+            QString::number(visible_course->type == CourseType::Score ? r.points : r.seq),
             r.code, r.part, r.feature, r.approach, r.dims, r.location, r.other
         };
         for (int c = 0; c < NCOLS; ++c)
