@@ -264,6 +264,10 @@ protected:
 
 	/** Export a world file */
 	bool exportWorldFile(const QString& path) const;
+
+	/** Copies the WGS84 corner coordinates of the print area to the clipboard,
+	 *  for pasting into the Competra distance map upload form. */
+	void showCompetraBounds() const;
 	
 	/** Exports to a PDF file. */
 	void exportToPdf();
@@ -303,6 +307,7 @@ private:
 	QCheckBox* show_grid_check;
 	QCheckBox* overprinting_check;
 	QCheckBox* world_file_check;
+	QCheckBox* competra_bounds_check;
 	QCheckBox* transparent_background_check;
 	QCheckBox* different_scale_check;
 	QSpinBox* different_scale_edit;

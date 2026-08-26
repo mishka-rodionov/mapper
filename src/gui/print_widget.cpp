@@ -23,6 +23,7 @@
 
 #include "print_widget.h"
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 // IWYU pragma: no_include <type_traits>
@@ -32,9 +33,11 @@
 #include <QAbstractButton> // IWYU pragma: keep
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QColor>
 #include <QComboBox>
 #include <QDialog>
+#include <QGuiApplication>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFile>
@@ -82,6 +85,7 @@
 #include <printer_properties.h>
 
 #include "core/georeferencing.h"
+#include "core/latlon.h"
 #include "core/map.h"
 #include "core/map_coord.h"
 #include "core/map_printer.h"
@@ -302,6 +306,10 @@ PrintWidget::PrintWidget(Map* map, MainWindow* main_window, MapView* main_view, 
 	world_file_check = new QCheckBox(tr("Save world file"));
 	layout->addRow(world_file_check);
 	world_file_check->hide();
+
+	competra_bounds_check = new QCheckBox(tr("Copy WGS84 map corners for Competra"));
+	layout->addRow(competra_bounds_check);
+	competra_bounds_check->hide();
 	
 	transparent_background_check = new QCheckBox(tr("Transparent background"));
 	layout->addRow(transparent_background_check);
@@ -675,7 +683,14 @@ void PrintWidget::setTarget(const QPrinterInfo* target)
 	// If MapCoord (0,0) maps to projected (0,0), then there is probably
 	// no point in writing a world file.
 	world_file_check->setChecked(!map->getGeoreferencing().toProjectedCoords(MapCoordF{}).isNull());
-	
+
+	bool const is_geospatial = map->getGeoreferencing().getState() == Georeferencing::Geospatial;
+	competra_bounds_check->setVisible(is_image_target);
+	competra_bounds_check->setEnabled(is_geospatial);
+	competra_bounds_check->setChecked(is_geospatial);
+	competra_bounds_check->setToolTip(is_geospatial ? QString()
+	    : tr("The map must be georeferenced (Map > Georeferencing) for this."));
+
 	transparent_background_check->setVisible(is_image_target);
 	
 	updateColorMode();
@@ -1350,8 +1365,43 @@ void PrintWidget::exportToImage()
 			if (!exportWorldFile(path))
 				QMessageBox::warning(this, tr("Error"), tr("Failed to save the world file."));
 		}
+		if (competra_bounds_check->isChecked())
+		{
+			showCompetraBounds();
+		}
 		emit finished(0);
 	}
+}
+
+void PrintWidget::showCompetraBounds() const
+{
+	const auto& georef = map->getGeoreferencing();
+	if (georef.getState() != Georeferencing::Geospatial)
+		return;
+
+	// Assumes a north-up map (standard for printed orienteering maps): takes
+	// the geographic bounding box of the print area's four corners rather
+	// than a full affine transform, so a simple top-left/bottom-right pair
+	// is enough for the caller to overlay the exported raster on OSM.
+	const auto area = map_printer->getPrintArea();
+	const auto p0 = georef.toGeographicCoords(MapCoordF(area.topLeft()));
+	const auto p1 = georef.toGeographicCoords(MapCoordF(area.topRight()));
+	const auto p2 = georef.toGeographicCoords(MapCoordF(area.bottomRight()));
+	const auto p3 = georef.toGeographicCoords(MapCoordF(area.bottomLeft()));
+
+	const auto top = std::max({p0.latitude(), p1.latitude(), p2.latitude(), p3.latitude()});
+	const auto bottom = std::min({p0.latitude(), p1.latitude(), p2.latitude(), p3.latitude()});
+	const auto left = std::min({p0.longitude(), p1.longitude(), p2.longitude(), p3.longitude()});
+	const auto right = std::max({p0.longitude(), p1.longitude(), p2.longitude(), p3.longitude()});
+
+	const auto text = QStringLiteral(
+	    "mapTopLeftLat=%1\nmapTopLeftLng=%2\nmapBottomRightLat=%3\nmapBottomRightLng=%4"
+	).arg(top, 0, 'f', 7).arg(left, 0, 'f', 7).arg(bottom, 0, 'f', 7).arg(right, 0, 'f', 7);
+
+	QGuiApplication::clipboard()->setText(text);
+	QMessageBox::information(const_cast<PrintWidget*>(this), tr("Competra map bounds"),
+	    tr("These WGS84 corner coordinates have been copied to the clipboard.\n"
+	       "Paste them into the distance map upload form on the Competra website:\n\n%1").arg(text));
 }
 
 bool PrintWidget::exportWorldFile(const QString& path) const
