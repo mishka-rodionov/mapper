@@ -85,6 +85,7 @@ UndoStep* UndoStep::getUndoStepForType(Type type, Map* map)
 	case CourseControlDescEditType:
 	case CoursesChangedType:
 	case CourseControlNumberMovedType:
+	case CourseDatabaseReplacedType:
 		return new NoOpUndoStep(map, true);
 
 	default:

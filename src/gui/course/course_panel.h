@@ -83,10 +83,13 @@ private slots:
     void rebuildCoursesList();
     void rebuildEntriesList();
 
+    // Panel-wide actions
+    void importCoursesFromFile();
+
     // Controls tab actions
     void onControlItemClicked(QTreeWidgetItem* item, int column);
     void onControlContextMenu(const QPoint& pos);
-    void deleteSelectedControl();
+    void deleteSelectedControls();
     void updateSelectionSummary();
     void onControlSelectionModelChanged(const QItemSelection& selected, const QItemSelection& deselected);
     void onCourseTargetComboChanged(int index);
@@ -128,6 +131,7 @@ private:
     CourseOverlay*   overlay;  // may be nullptr
 
     QTabWidget*   tabs            = nullptr;
+    QPushButton*  import_courses_btn = nullptr;
 
     // Controls tab — type selector
     QButtonGroup* type_button_group = nullptr;

@@ -25,6 +25,8 @@
 
 #include <QButtonGroup>
 #include <QComboBox>
+#include <QFile>
+#include <QFileDialog>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QItemSelection>
@@ -42,14 +44,17 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
+#include <QXmlStreamReader>
 
 #include "core/map.h"
 #include "course/course.h"
 #include "course/course_control.h"
 #include "course/course_database.h"
 #include "course/course_overlay.h"
+#include "course/course_serialization.h"
 #include "course/course_undo.h"
 #include "gui/course/control_properties_widget.h"
+#include "undo/undo.h"
 
 
 namespace OpenOrienteering {
@@ -98,6 +103,7 @@ protected:
                                                           const QEvent* event) const override
     {
         if (event && event->type() == QEvent::MouseButtonPress
+            && static_cast<const QMouseEvent*>(event)->button() == Qt::LeftButton
             && !(static_cast<const QMouseEvent*>(event)->modifiers() & Qt::ShiftModifier))
         {
             return QItemSelectionModel::Toggle | QItemSelectionModel::Rows;
@@ -254,14 +260,14 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
 
         // Entries sub-section
         entries_list = new QListWidget;
-        entries_list->setSelectionMode(QAbstractItemView::SingleSelection);
+        entries_list->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
         add_entry_btn    = new QPushButton(tr("Add selected"));
         remove_entry_btn = new QPushButton(tr("Remove"));
         entry_up_btn     = new QPushButton(tr("Up"));
         entry_down_btn   = new QPushButton(tr("Down"));
         add_entry_btn->setToolTip(tr("Add the controls selected in the Controls tab to this course"));
-        remove_entry_btn->setToolTip(tr("Remove the selected entry from this course"));
+        remove_entry_btn->setToolTip(tr("Remove the selected entries from this course"));
 
         connect(add_entry_btn,    &QPushButton::clicked, this, &CoursePanelWidget::addSelectedControlToCourse);
         connect(remove_entry_btn, &QPushButton::clicked, this, &CoursePanelWidget::removeEntryFromCourse);
@@ -359,9 +365,17 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
         tabs->addTab(tab, tr("Courses"));
     }
 
+    import_courses_btn = new QPushButton(tr("Import courses file…"));
+    import_courses_btn->setToolTip(
+        tr("Load a previously saved .courses file onto this map, "
+           "replacing the current controls and courses (undoable)"));
+    connect(import_courses_btn, &QPushButton::clicked,
+            this, &CoursePanelWidget::importCoursesFromFile);
+
     auto* main_layout = new QVBoxLayout(this);
+    main_layout->addWidget(import_courses_btn);
     main_layout->addWidget(tabs);
-    main_layout->setContentsMargins(0, 0, 0, 0);
+    main_layout->setContentsMargins(4, 4, 4, 4);
     setLayout(main_layout);
 
     if (overlay)
@@ -381,6 +395,93 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
     // Initial population
     rebuildControlsTree();
     rebuildCoursesList();
+}
+
+
+// ── Import ────────────────────────────────────────────────────────────────────
+
+void CoursePanelWidget::importCoursesFromFile()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Import Courses File"), {},
+        tr("Course files (*.courses);;All files (*)"));
+    if (path.isEmpty())
+        return;
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        QMessageBox::warning(this, tr("Import Courses"),
+            tr("Cannot open file:\n%1\n%2").arg(path, file.errorString()));
+        return;
+    }
+
+    QXmlStreamReader xml(&file);
+    if (!xml.readNextStartElement() || xml.name() != QLatin1String("courses"))
+    {
+        QMessageBox::warning(this, tr("Import Courses"),
+            tr("This file does not contain course data:\n%1").arg(path));
+        return;
+    }
+
+    // Load into a scratch database first, so a malformed file cannot
+    // damage the courses already on the map.
+    CourseDatabase imported;
+    CourseSerialization::load(xml, imported);
+    if (xml.error())
+    {
+        QMessageBox::warning(this, tr("Import Courses"),
+            tr("Failed to read course data:\n%1").arg(xml.errorString()));
+        return;
+    }
+    if (imported.numControls() == 0 && imported.numCourses() == 0 && imported.eventName().isEmpty())
+    {
+        QMessageBox::information(this, tr("Import Courses"),
+            tr("The selected file does not contain any controls or courses."));
+        return;
+    }
+
+    if (db.numControls() > 0 || db.numCourses() > 0)
+    {
+        const auto reply = QMessageBox::question(
+            this, tr("Import Courses"),
+            tr("This will replace all controls and courses currently on the map "
+               "with the contents of the selected file. This can be undone.\n\n"
+               "Continue?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (reply != QMessageBox::Yes)
+            return;
+    }
+
+    // Snapshot the current database for undo
+    std::vector<CourseControl> controls_before;
+    controls_before.reserve(std::size_t(db.numControls()));
+    for (int i = 0; i < db.numControls(); ++i)
+        controls_before.push_back(db.control(i));
+    auto courses_before = coursesSnapshot();
+    const QString event_name_before = db.eventName();
+    const bool legend_anchor_valid_before = db.hasLegendAnchor();
+    const MapCoordF legend_anchor_before = db.legendAnchor();
+
+    // Clear the current database and replace it with the imported data
+    while (db.numCourses() > 0)
+        db.removeCourse(db.numCourses() - 1);
+    while (db.numControls() > 0)
+        db.removeControl(db.numControls() - 1);
+
+    for (int i = 0; i < imported.numControls(); ++i)
+        db.addControl(imported.control(i));
+    for (int i = 0; i < imported.numCourses(); ++i)
+        db.addCourse(imported.course(i));
+    db.setEventName(imported.eventName());
+    if (imported.hasLegendAnchor())
+        db.setLegendAnchor(imported.legendAnchor());
+    else
+        db.clearLegendAnchor();
+
+    map.push(new ReplaceCourseDatabaseUndoStep(
+        &map, std::move(controls_before), std::move(courses_before),
+        event_name_before, legend_anchor_valid_before, legend_anchor_before));
 }
 
 
@@ -457,29 +558,46 @@ void CoursePanelWidget::onControlContextMenu(const QPoint& pos)
     auto* item = controls_tree->itemAt(pos);
     if (!item) return;
 
-    QMenu menu(this);
-    auto* del_act = menu.addAction(tr("Delete control"));
-    if (menu.exec(controls_tree->mapToGlobal(pos)) == del_act)
+    // A right-click on an item outside the current multi-selection replaces
+    // the selection with just that item, matching common list/tree UX.
+    const QString clicked_id = item->data(0, Qt::UserRole).toString();
+    if (std::find(selected_control_order.begin(), selected_control_order.end(), clicked_id)
+        == selected_control_order.end())
     {
-        selected_control_id = item->data(0, Qt::UserRole).toString();
-        deleteSelectedControl();
+        controls_tree->setCurrentItem(item, 0, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
     }
+
+    const auto count = selected_control_order.size();
+    QMenu menu(this);
+    auto* del_act = menu.addAction(count > 1 ? tr("Delete %1 controls").arg(int(count))
+                                              : tr("Delete control"));
+    if (menu.exec(controls_tree->mapToGlobal(pos)) == del_act)
+        deleteSelectedControls();
 }
 
-void CoursePanelWidget::deleteSelectedControl()
+void CoursePanelWidget::deleteSelectedControls()
 {
-    if (selected_control_id.isEmpty()) return;
-    for (int i = 0; i < db.numControls(); ++i)
+    const auto ids = selectedControlIds();
+    if (ids.empty()) return;
+
+    auto* combined = new CombinedUndoStep(&map);
+    for (const auto& id : ids)
     {
-        if (db.control(i).id == selected_control_id)
+        for (int i = 0; i < db.numControls(); ++i)
         {
-            map.push(new RemoveControlUndoStep(&map, db.control(i)));
-            db.removeControl(i);
-            selected_control_id.clear();
-            emit controlSelected({});
-            return;
+            if (db.control(i).id == id)
+            {
+                combined->push(new RemoveControlUndoStep(&map, db.control(i)));
+                db.removeControl(i);
+                break;
+            }
         }
     }
+    map.push(combined);
+
+    selected_control_id.clear();
+    selected_control_order.clear();
+    emit controlSelected({});
 }
 
 void CoursePanelWidget::updateSelectionSummary()
@@ -852,12 +970,20 @@ void CoursePanelWidget::removeEntryFromCourse()
 {
     const int course_idx = selectedCourseIndex();
     if (course_idx < 0) return;
-    const int entry_idx = entries_list->currentRow();
-    if (entry_idx < 0) return;
+
+    const auto selected_items = entries_list->selectedItems();
+    if (selected_items.isEmpty()) return;
+
+    std::vector<int> rows;
+    rows.reserve(std::size_t(selected_items.size()));
+    for (auto* item : selected_items)
+        rows.push_back(entries_list->row(item));
+    std::sort(rows.begin(), rows.end());
 
     auto snapshot = coursesSnapshot();
     auto updated = db.course(course_idx);
-    updated.entries.erase(updated.entries.begin() + entry_idx);
+    for (auto it = rows.rbegin(); it != rows.rend(); ++it)
+        updated.entries.erase(updated.entries.begin() + *it);
     db.updateCourse(course_idx, std::move(updated));
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
 }

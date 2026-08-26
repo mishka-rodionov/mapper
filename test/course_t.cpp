@@ -21,14 +21,18 @@
 
 #include <QtTest>
 #include <QBuffer>
+#include <QFile>
+#include <QTemporaryDir>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
+#include "core/map.h"
+#include "core/map_coord.h"
 #include "course/course.h"
 #include "course/course_control.h"
 #include "course/course_database.h"
 #include "course/course_serialization.h"
-#include "core/map_coord.h"
+#include "fileformats/xml_file_format_p.h"
 
 
 namespace OpenOrienteering {
@@ -221,6 +225,74 @@ void CourseTest::databaseSignals()
 }
 
 
+void CourseTest::sidecarFile()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto map_path = dir.filePath(QStringLiteral("test.omap"));
+    const auto sidecar_path = map_path + QLatin1String(".courses");
+
+    // ── Save a map with course data ─────────────────────────────────────────
+
+    {
+        Map map;
+        auto& db = map.courseDatabase();
+        db.setEventName(QStringLiteral("Sprint 2026"));
+
+        CourseControl ctrl;
+        ctrl.id       = QStringLiteral("101");
+        ctrl.type     = ControlType::Regular;
+        ctrl.position = MapCoord::fromNative(1000, 2000);
+        db.addControl(ctrl);
+
+        XMLFileExporter exporter{ map_path, &map, nullptr };
+        QVERIFY(exporter.doExport());
+        QCOMPARE(exporter.warnings().size(), std::size_t(0));
+    }
+
+    // ── The map file itself stays free of course data ───────────────────────
+
+    QVERIFY(QFile::exists(map_path));
+    {
+        QFile map_file{ map_path };
+        QVERIFY(map_file.open(QIODevice::ReadOnly));
+        QVERIFY(!map_file.readAll().contains("<courses"));
+    }
+
+    // ── The course data lives in the sidecar file ────────────────────────────
+
+    QVERIFY(QFile::exists(sidecar_path));
+    {
+        QFile sidecar_file{ sidecar_path };
+        QVERIFY(sidecar_file.open(QIODevice::ReadOnly));
+        QVERIFY(sidecar_file.readAll().contains("<courses"));
+    }
+
+    // ── Loading the map recovers the course data from the sidecar file ──────
+
+    {
+        Map map;
+        XMLFileImporter importer{ map_path, &map, nullptr };
+        QVERIFY(importer.doImport());
+        QCOMPARE(importer.warnings().size(), std::size_t(0));
+
+        const auto& db = map.courseDatabase();
+        QCOMPARE(db.eventName(), QStringLiteral("Sprint 2026"));
+        QCOMPARE(db.numControls(), 1);
+        QCOMPARE(db.control(0).id, QStringLiteral("101"));
+    }
+
+    // ── Saving an empty course database removes a stale sidecar file ────────
+
+    {
+        Map map;
+        XMLFileExporter exporter{ map_path, &map, nullptr };
+        QVERIFY(exporter.doExport());
+    }
+    QVERIFY(!QFile::exists(sidecar_path));
+}
+
+
 }  // namespace OpenOrienteering
 
-QTEST_GUILESS_MAIN(OpenOrienteering::CourseTest)
+QTEST_MAIN(OpenOrienteering::CourseTest)

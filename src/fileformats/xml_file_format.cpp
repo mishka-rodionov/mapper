@@ -32,6 +32,7 @@
 #include <QByteArray>
 #include <QDir>
 #include <QExplicitlySharedDataPointer>
+#include <QFile>
 #include <QFileInfo>
 #include <QFlags>
 #include <QIODevice>
@@ -39,6 +40,7 @@
 #include <QLocale>
 #include <QObject>
 #include <QRectF>
+#include <QSaveFile>
 #include <QScopedValueRollback>
 #include <QString>
 #include <QStringRef>
@@ -215,6 +217,16 @@ namespace literal
 }
 
 
+/**
+ * Determines the path of the sidecar file which holds the course data
+ * belonging to the map file at the given path.
+ */
+static QString coursesSidecarPath(const QString& map_path)
+{
+	return map_path + QLatin1String(".courses");
+}
+
+
 
 // ### XMLFileExporter definition ###
 
@@ -289,9 +301,6 @@ bool XMLFileExporter::exportImplementation()
 		delete barrier;
 		writeLineBreak(xml);
 
-		exportCourses();
-		writeLineBreak(xml);
-
 		if (Settings::getInstance().getSetting(Settings::General_SaveUndoRedo).toBool()
 		    && (map->undoManager().canUndo() || map->undoManager().canRedo()) )
 		{
@@ -309,8 +318,11 @@ bool XMLFileExporter::exportImplementation()
 			writeLineBreak(xml);
 		}
 	}
-	
+
 	xml.writeEndDocument();
+
+	exportCourses();
+
 	return true;
 }
 
@@ -509,12 +521,32 @@ void XMLFileExporter::exportPrint()
 
 void XMLFileExporter::exportCourses()
 {
+	if (path.isEmpty())
+		return;  // no sidecar target, e.g. when exporting to a memory buffer
+
+	const auto sidecar_path = coursesSidecarPath(path);
 	const auto& db = map->courseDatabase();
-	if (db.numControls() > 0 || db.numCourses() > 0 || !db.eventName().isEmpty())
+	if (db.numControls() == 0 && db.numCourses() == 0 && db.eventName().isEmpty())
 	{
-		CourseSerialization::save(xml, db);
-		writeLineBreak(xml);
+		QFile::remove(sidecar_path);
+		return;
 	}
+
+	QSaveFile file(sidecar_path);
+	if (!file.open(QIODevice::WriteOnly))
+	{
+		addWarning(tr("Cannot open courses file\n%1:\n%2").arg(sidecar_path, file.errorString()));
+		return;
+	}
+
+	QXmlStreamWriter courses_xml(&file);
+	courses_xml.setAutoFormatting(xml.autoFormatting());
+	courses_xml.writeStartDocument();
+	CourseSerialization::save(courses_xml, db);
+	courses_xml.writeEndDocument();
+
+	if (!file.commit())
+		addWarning(tr("Cannot save courses file\n%1:\n%2").arg(sidecar_path, file.errorString()));
 }
 
 void XMLFileExporter::exportUndo()
@@ -583,7 +615,8 @@ bool XMLFileImporter::importImplementation()
 	MapCoord::boundsOffset().reset(true);
 	georef_offset_adjusted = false;
 	importElements();
-	
+	importCoursesSidecar();
+
 	auto offset = MapCoord::boundsOffset();
 	if (!loadSymbolsOnly() && !offset.isZero())
 	{
@@ -1096,8 +1129,47 @@ void XMLFileImporter::importPrint()
 
 void XMLFileImporter::importCourses()
 {
+	// Legacy support: older Mapper versions embedded the courses directly
+	// in the map file, instead of writing them to a sidecar file.
 	FILEFORMAT_ASSERT(xml.name() == literal::courses);
 	CourseSerialization::load(xml, map->courseDatabase());
+}
+
+void XMLFileImporter::importCoursesSidecar()
+{
+	if (path.isEmpty())
+		return;  // no sidecar source, e.g. when importing from a memory buffer
+
+	const auto sidecar_path = coursesSidecarPath(path);
+	QFile file(sidecar_path);
+	if (!file.exists())
+		return;
+
+	if (!file.open(QIODevice::ReadOnly))
+	{
+		addWarning(tr("Cannot open courses file\n%1:\n%2").arg(sidecar_path, file.errorString()));
+		return;
+	}
+
+	QXmlStreamReader courses_xml(&file);
+	if (!courses_xml.readNextStartElement() || courses_xml.name() != literal::courses)
+	{
+		addWarning(tr("Invalid courses file: %1").arg(sidecar_path));
+		return;
+	}
+
+	try
+	{
+		CourseSerialization::load(courses_xml, map->courseDatabase());
+	}
+	catch (FileFormatException& e)
+	{
+		addWarning(tr("Error while loading courses from %1 at %2:%3: %4")
+		           .arg(sidecar_path).arg(courses_xml.lineNumber()).arg(courses_xml.columnNumber()).arg(e.message()));
+	}
+
+	if (courses_xml.error())
+		addWarning(tr("Error while loading courses from %1: %2").arg(sidecar_path, courses_xml.errorString()));
 }
 
 void XMLFileImporter::importUndo()

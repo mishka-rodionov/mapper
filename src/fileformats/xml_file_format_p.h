@@ -99,6 +99,7 @@ protected:
 	void importView();
 	void importPrint();
 	void importCourses();
+	void importCoursesSidecar();
 	void importUndo();
 	void importRedo();
 	

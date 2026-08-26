@@ -41,6 +41,8 @@ private slots:
 
     void generateUniqueId();
     void databaseSignals();
+
+    void sidecarFile();
 };
 
 

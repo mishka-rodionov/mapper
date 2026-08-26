@@ -169,6 +169,39 @@ private:
 };
 
 
+/**
+ * Undo step for replacing the entire course database in one go
+ * (e.g. importing a .courses file onto the map).
+ *
+ * Stores a full snapshot of controls, courses, event name and legend anchor
+ * before the change. undo() clears the database and restores the snapshot,
+ * returning a step holding the post-change state (for redo).
+ */
+class ReplaceCourseDatabaseUndoStep : public UndoStep
+{
+public:
+    ReplaceCourseDatabaseUndoStep(Map* map,
+                                  std::vector<CourseControl> controls_snapshot,
+                                  std::vector<Course> courses_snapshot,
+                                  QString event_name_snapshot,
+                                  bool legend_anchor_valid_snapshot,
+                                  MapCoordF legend_anchor_snapshot);
+    ~ReplaceCourseDatabaseUndoStep() override = default;
+
+    UndoStep* undo() override;
+
+protected:
+    void saveImpl(QXmlStreamWriter& xml) const override;
+
+private:
+    std::vector<CourseControl> controls_snapshot;
+    std::vector<Course>        courses_snapshot;
+    QString                    event_name_snapshot;
+    bool                       legend_anchor_valid_snapshot;
+    MapCoordF                  legend_anchor_snapshot;
+};
+
+
 }  // namespace OpenOrienteering
 
 #endif  // OPENORIENTEERING_COURSE_UNDO_H

@@ -266,4 +266,67 @@ void CoursesChangedUndoStep::saveImpl(QXmlStreamWriter& xml) const
 }
 
 
+// ============================================================
+// ReplaceCourseDatabaseUndoStep
+// ============================================================
+
+ReplaceCourseDatabaseUndoStep::ReplaceCourseDatabaseUndoStep(
+        Map* map,
+        std::vector<CourseControl> controls_snapshot,
+        std::vector<Course> courses_snapshot,
+        QString event_name_snapshot,
+        bool legend_anchor_valid_snapshot,
+        MapCoordF legend_anchor_snapshot)
+: UndoStep(CourseDatabaseReplacedType, map)
+, controls_snapshot(std::move(controls_snapshot))
+, courses_snapshot(std::move(courses_snapshot))
+, event_name_snapshot(std::move(event_name_snapshot))
+, legend_anchor_valid_snapshot(legend_anchor_valid_snapshot)
+, legend_anchor_snapshot(legend_anchor_snapshot)
+{}
+
+UndoStep* ReplaceCourseDatabaseUndoStep::undo()
+{
+    CourseDatabase& db = map->courseDatabase();
+
+    // Capture current state for the redo step
+    std::vector<CourseControl> current_controls;
+    current_controls.reserve(std::size_t(db.numControls()));
+    for (int i = 0; i < db.numControls(); ++i)
+        current_controls.push_back(db.control(i));
+
+    std::vector<Course> current_courses;
+    current_courses.reserve(std::size_t(db.numCourses()));
+    for (int i = 0; i < db.numCourses(); ++i)
+        current_courses.push_back(db.course(i));
+
+    auto* redo = new ReplaceCourseDatabaseUndoStep(
+        map, std::move(current_controls), std::move(current_courses),
+        db.eventName(), db.hasLegendAnchor(), db.legendAnchor());
+
+    // Clear the database and restore from snapshot
+    while (db.numCourses() > 0)
+        db.removeCourse(db.numCourses() - 1);
+    while (db.numControls() > 0)
+        db.removeControl(db.numControls() - 1);
+
+    for (auto& c : controls_snapshot)
+        db.addControl(c);
+    for (auto& c : courses_snapshot)
+        db.addCourse(c);
+    db.setEventName(event_name_snapshot);
+    if (legend_anchor_valid_snapshot)
+        db.setLegendAnchor(legend_anchor_snapshot);
+    else
+        db.clearLegendAnchor();
+
+    return redo;
+}
+
+void ReplaceCourseDatabaseUndoStep::saveImpl(QXmlStreamWriter& xml) const
+{
+    UndoStep::saveImpl(xml);
+}
+
+
 }  // namespace OpenOrienteering
