@@ -57,6 +57,7 @@ protected:
 	void exportTemplates();
 	void exportView();
 	void exportPrint();
+	void exportCourseFilesMeta();
 	void exportCourses();
 	void exportUndo();
 	void exportRedo();
@@ -99,6 +100,7 @@ protected:
 	void importView();
 	void importPrint();
 	void importCourses();
+	void importCourseFilesMeta();
 	void importCoursesSidecar();
 	void importUndo();
 	void importRedo();

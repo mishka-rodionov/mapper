@@ -24,6 +24,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 
 #include "core/map_coord.h"
 #include "course/course.h"
@@ -112,6 +113,44 @@ public:
     void clearLegendAnchor();
 
 
+    // --- Course file association ---
+    //
+    // The database's content may be associated with a *.courses sidecar
+    // file living next to the map file. The association is tracked here
+    // (rather than derived from a fixed naming convention) so that a map
+    // can be detached from its course file without deleting or renaming
+    // that file, and so a map can remember previously-used course files
+    // for quick re-attachment.
+    //
+    // Both fields are just names (relative to the map's directory), not
+    // file content — resolving/reading/writing is done by callers via
+    // CourseSerialization.
+
+    /** Name (relative to the map directory) of the currently associated
+     *  course file, or empty if the database is not associated with any
+     *  file (e.g. right after "Clear courses from map"). */
+    const QString& activeFile() const { return active_file; }
+
+    /**
+     * Sets the active file. A non-empty name is also recorded in the
+     * recent-files history (moved to the front, deduplicated). Passing
+     * an empty name only clears the active pointer — any previous name
+     * stays in the history so it won't be picked again for a new file.
+     */
+    void setActiveFile(const QString& name);
+
+    /** Sets the active file without touching the history. Used when
+     *  restoring an exact prior state (undo/redo, loading from XML). */
+    void setActiveFileRaw(const QString& name);
+
+    /** Names (relative to the map directory) of course files previously
+     *  associated with this map, most-recently-used first. */
+    const QStringList& recentFiles() const { return recent_files; }
+
+    /** Sets the recent-files history verbatim. Used when loading from XML. */
+    void setRecentFilesRaw(QStringList names);
+
+
 signals:
     void eventNameChanged();
     void controlAdded(int index);
@@ -120,6 +159,7 @@ signals:
     void courseAdded(int index);
     void courseChanged(int index);
     void courseRemoved(int index);
+    void activeFileChanged();
 
 private:
     QString event_name;
@@ -127,6 +167,8 @@ private:
     std::vector<Course> courses;
     MapCoordF legend_anchor;
     bool legend_anchor_valid = false;
+    QString active_file;
+    QStringList recent_files;
 };
 
 

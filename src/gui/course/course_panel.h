@@ -28,10 +28,12 @@
 #include "course/course.h"
 #include "course/course_control.h"
 
+class QAction;
 class QButtonGroup;
 class QComboBox;
 class QLabel;
 class QListWidget;
+class QMenu;
 class QPushButton;
 class QSpinBox;
 class QTabWidget;
@@ -46,6 +48,7 @@ class ControlPropertiesWidget;
 class CourseDatabase;
 class CourseOverlay;
 class Map;
+class MainWindow;
 
 
 /**
@@ -60,8 +63,8 @@ class CoursePanelWidget : public QWidget
     Q_OBJECT
 
 public:
-    CoursePanelWidget(Map& map, CourseDatabase& db,
-                      CourseOverlay* overlay, QWidget* parent = nullptr);
+    CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay* overlay,
+                      MainWindow* main_window, QWidget* parent = nullptr);
     ~CoursePanelWidget() override = default;
 
     /** Highlights the given control (e.g. after PlaceControlTool selects it). */
@@ -85,6 +88,10 @@ private slots:
 
     // Panel-wide actions
     void importCoursesFromFile();
+    void clearCoursesFromMap();
+    void updateActiveFileLabel();
+    void showRecentCoursesMenu();
+    void activateRecentCourseFile(const QString& relative_name);
 
     // Controls tab actions
     void onControlItemClicked(QTreeWidgetItem* item, int column);
@@ -120,6 +127,14 @@ private:
     /** Returns selected control ids in the order they were selected (click order). */
     std::vector<QString> selectedControlIds() const;
 
+    /**
+     * Replaces the database content with what's in the file at
+     * absolute_path (confirming first if the map already has content),
+     * pushes an undo step, and sets relative_name as the new active file.
+     * Shared by "Import courses file…" and reactivating a recent file.
+     */
+    void loadCourseFileOntoMap(const QString& absolute_path, const QString& relative_name);
+
     /** Pushes CoursesChangedUndoStep then commits the new courses. */
     void commitCoursesChange(std::vector<Course> before_snapshot,
                              std::vector<Course> new_courses);
@@ -129,9 +144,13 @@ private:
     Map&             map;
     CourseDatabase&  db;
     CourseOverlay*   overlay;  // may be nullptr
+    MainWindow*      main_window;  // may be nullptr; used to locate the .courses sidecar
 
     QTabWidget*   tabs            = nullptr;
     QPushButton*  import_courses_btn = nullptr;
+    QPushButton*  clear_courses_btn  = nullptr;
+    QToolButton*  recent_courses_btn = nullptr;
+    QLabel*       active_file_label  = nullptr;
 
     // Controls tab — type selector
     QButtonGroup* type_button_group = nullptr;

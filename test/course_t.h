@@ -43,6 +43,7 @@ private slots:
     void databaseSignals();
 
     void sidecarFile();
+    void courseFileDetachAndReattach();
 };
 
 

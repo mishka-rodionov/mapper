@@ -26,6 +26,7 @@
 
 #include "core/map.h"
 #include "course/course_database.h"
+#include "course/course_serialization.h"
 #include "gui/main_window.h"
 #include "course/course_overlay.h"
 #include "fileformats/file_format_registry.h"
@@ -50,6 +51,11 @@ CourseFeature::CourseFeature(MapEditorController& controller)
     course_overlay = std::make_unique<CourseOverlay>(
         controller.getMainWidget(),
         controller.getMap()->courseDatabase());
+
+    auto& db = controller.getMap()->courseDatabase();
+    connect(&db, &CourseDatabase::controlAdded, this, &CourseFeature::ensureActiveCourseFileName);
+    connect(&db, &CourseDatabase::courseAdded,  this, &CourseFeature::ensureActiveCourseFileName);
+    connect(&db, &CourseDatabase::eventNameChanged, this, &CourseFeature::ensureActiveCourseFileName);
 
     // "Course Planning" panel toggle action
     show_panel_act = new QAction(tr("Course &Planning"), this);
@@ -132,6 +138,20 @@ void CourseFeature::onControlSelectedInTool(const QString& control_id)
 }
 
 
+void CourseFeature::ensureActiveCourseFileName()
+{
+    auto& db = controller.getMap()->courseDatabase();
+    if (!db.activeFile().isEmpty())
+        return;
+
+    const QString map_path = controller.getWindow()->currentPath();
+    if (map_path.isEmpty())
+        return;  // map has no path yet (never saved); resolved at next opportunity
+
+    db.setActiveFile(CourseSerialization::pickAvailableCourseFileName(map_path, db.recentFiles()));
+}
+
+
 void CourseFeature::exportIofFull()
 {
     const auto& db = controller.getMap()->courseDatabase();
@@ -205,7 +225,8 @@ void CourseFeature::createDockWidget()
     panel = new CoursePanelWidget(
         *controller.getMap(),
         controller.getMap()->courseDatabase(),
-        course_overlay.get());
+        course_overlay.get(),
+        controller.getWindow());
 
     connect(panel, &CoursePanelWidget::controlSelected,
             this, [this](const QString& id) {

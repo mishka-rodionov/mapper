@@ -214,18 +214,10 @@ namespace literal
 	static const QLatin1String undo("undo");
 	static const QLatin1String redo("redo");
 	static const QLatin1String courses("courses");
+	static const QLatin1String course_files("course_files");
+	static const QLatin1String active("active");
+	static const QLatin1String recent("recent");
 }
-
-
-/**
- * Determines the path of the sidecar file which holds the course data
- * belonging to the map file at the given path.
- */
-static QString coursesSidecarPath(const QString& map_path)
-{
-	return map_path + QLatin1String(".courses");
-}
-
 
 
 // ### XMLFileExporter definition ###
@@ -299,6 +291,8 @@ bool XMLFileExporter::exportImplementation()
 		writeLineBreak(xml);
 		exportPrint();
 		delete barrier;
+		writeLineBreak(xml);
+		exportCourseFilesMeta();
 		writeLineBreak(xml);
 
 		if (Settings::getInstance().getSetting(Settings::General_SaveUndoRedo).toBool()
@@ -519,18 +513,79 @@ void XMLFileExporter::exportPrint()
 	}
 }
 
+namespace {
+
+/**
+ * Determines the course file association to persist for this save:
+ * the active file name, the recent-files history, and whether the
+ * database currently holds any course content.
+ *
+ * Normally CourseFeature assigns an active file name as soon as the
+ * first control/course is added to a database that has a known map
+ * path (see CourseFeature::ensureActiveCourseFileName), so by the time
+ * a save happens db.activeFile() is already correct. The fallback here
+ * only matters for content that was added before the map ever had a
+ * path (e.g. before the first Save As) — it computes a name for this
+ * save without mutating the (const) map.
+ */
+void resolveCourseFilesAssoc(const Map* map, const QString& path,
+                              QString& active, QStringList& recent, bool& has_content)
+{
+	const auto& db = map->courseDatabase();
+	has_content = db.numControls() > 0 || db.numCourses() > 0 || !db.eventName().isEmpty();
+	active = db.activeFile();
+	recent = db.recentFiles();
+	if (has_content && active.isEmpty() && !path.isEmpty())
+	{
+		active = CourseSerialization::pickAvailableCourseFileName(path, recent);
+		if (!recent.contains(active))
+			recent.prepend(active);
+	}
+}
+
+}  // namespace
+
+
+void XMLFileExporter::exportCourseFilesMeta()
+{
+	QString active;
+	QStringList recent;
+	bool has_content;
+	resolveCourseFilesAssoc(map, path, active, recent, has_content);
+
+	if (active.isEmpty() && recent.isEmpty())
+		return;  // course planning was never used on this map
+
+	XmlElementWriter element(xml, literal::course_files);
+	if (!active.isEmpty())
+		element.writeAttribute(literal::active, active);
+	for (const auto& name : qAsConst(recent))
+	{
+		XmlElementWriter recent_element(xml, literal::recent);
+		recent_element.writeAttribute(literal::name, name);
+	}
+}
+
 void XMLFileExporter::exportCourses()
 {
 	if (path.isEmpty())
 		return;  // no sidecar target, e.g. when exporting to a memory buffer
 
-	const auto sidecar_path = coursesSidecarPath(path);
+	QString active;
+	QStringList recent;
+	bool has_content;
+	resolveCourseFilesAssoc(map, path, active, recent, has_content);
+
+	if (active.isEmpty())
+		return;  // not associated with any file, or no path to fall back to
+
+	// Note: if has_content is false but active is set, we still write
+	// (an empty course document) rather than deleting the file: the
+	// association is explicit, and keeping the file in sync avoids a
+	// reload resurrecting stale content that the user just removed.
+
+	const auto sidecar_path = CourseSerialization::resolveCourseFilePath(path, active);
 	const auto& db = map->courseDatabase();
-	if (db.numControls() == 0 && db.numCourses() == 0 && db.eventName().isEmpty())
-	{
-		QFile::remove(sidecar_path);
-		return;
-	}
 
 	QSaveFile file(sidecar_path);
 	if (!file.open(QIODevice::WriteOnly))
@@ -683,6 +738,8 @@ void XMLFileImporter::importElements()
 			importPrint();
 		else if (name == literal::courses)
 			importCourses();
+		else if (name == literal::course_files)
+			importCourseFilesMeta();
 		else if (name == literal::undo)
 			importUndo();
 		else if (name == literal::redo)
@@ -1135,15 +1192,68 @@ void XMLFileImporter::importCourses()
 	CourseSerialization::load(xml, map->courseDatabase());
 }
 
+void XMLFileImporter::importCourseFilesMeta()
+{
+	FILEFORMAT_ASSERT(xml.name() == literal::course_files);
+
+	XmlElementReader element(xml);
+	QString active;
+	if (element.hasAttribute(literal::active))
+		active = element.attribute<QString>(literal::active);
+
+	QStringList recent;
+	while (xml.readNextStartElement())
+	{
+		if (xml.name() == literal::recent)
+		{
+			XmlElementReader recent_element(xml);
+			recent.push_back(recent_element.attribute<QString>(literal::name));
+		}
+		else
+		{
+			xml.skipCurrentElement();
+		}
+	}
+
+	auto& db = map->courseDatabase();
+	db.setActiveFileRaw(active);
+	db.setRecentFilesRaw(recent);
+}
+
 void XMLFileImporter::importCoursesSidecar()
 {
 	if (path.isEmpty())
 		return;  // no sidecar source, e.g. when importing from a memory buffer
 
-	const auto sidecar_path = coursesSidecarPath(path);
+	auto& db = map->courseDatabase();
+	QString active = db.activeFile();
+
+	if (active.isEmpty() && db.recentFiles().isEmpty())
+	{
+		// No <course_files> metadata was found while parsing the map
+		// (older Mapper version, or a map that never had explicit course
+		// file tracking saved yet). Fall back to the legacy fixed sidecar
+		// name and, if it exists, adopt it as this map's active course
+		// file from now on.
+		const auto legacy_path = CourseSerialization::coursesSidecarPath(path);
+		if (QFile::exists(legacy_path))
+		{
+			active = CourseSerialization::defaultCourseFileName(path);
+			db.setActiveFileRaw(active);
+			db.setRecentFilesRaw({ active });
+		}
+	}
+
+	if (active.isEmpty())
+		return;  // this map is not associated with any course file
+
+	const auto sidecar_path = CourseSerialization::resolveCourseFilePath(path, active);
 	QFile file(sidecar_path);
 	if (!file.exists())
+	{
+		addWarning(tr("Courses file not found:\n%1").arg(sidecar_path));
 		return;
+	}
 
 	if (!file.open(QIODevice::ReadOnly))
 	{
@@ -1160,7 +1270,7 @@ void XMLFileImporter::importCoursesSidecar()
 
 	try
 	{
-		CourseSerialization::load(courses_xml, map->courseDatabase());
+		CourseSerialization::load(courses_xml, db);
 	}
 	catch (FileFormatException& e)
 	{

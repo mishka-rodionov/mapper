@@ -20,6 +20,9 @@
 #ifndef OPENORIENTEERING_COURSE_SERIALIZATION_H
 #define OPENORIENTEERING_COURSE_SERIALIZATION_H
 
+#include <QString>
+#include <QStringList>
+
 class QXmlStreamReader;
 class QXmlStreamWriter;
 
@@ -40,6 +43,38 @@ namespace CourseSerialization {
 void save(QXmlStreamWriter& xml, const CourseDatabase& db);
 
 void load(QXmlStreamReader& xml, CourseDatabase& db);
+
+/**
+ * Returns the path of the sidecar file which holds the course data
+ * belonging to the map file at the given path (i.e. "<map_path>.courses").
+ *
+ * This is the *default* course file name, used for legacy maps that
+ * predate explicit course-file tracking, and as the first choice when
+ * auto-naming a course file for a map that never had one before.
+ */
+QString coursesSidecarPath(const QString& map_path);
+
+/**
+ * Returns the default course file name for the map at the given path,
+ * as a name relative to the map's directory (e.g. "MyMap.omap.courses").
+ */
+QString defaultCourseFileName(const QString& map_path);
+
+/**
+ * Resolves a course file name (as stored in CourseDatabase::activeFile()
+ * or ::recentFiles()) against the directory of the map at map_path,
+ * returning an absolute path.
+ */
+QString resolveCourseFilePath(const QString& map_path, const QString& relative_name);
+
+/**
+ * Picks a course file name for the map at map_path that is not already
+ * present in taken_names: the default name if free, otherwise the default
+ * name with a "-2", "-3", ... suffix. Used to avoid silently reusing the
+ * name of a course file the map was previously (and deliberately) detached
+ * from.
+ */
+QString pickAvailableCourseFileName(const QString& map_path, const QStringList& taken_names);
 
 }  // namespace CourseSerialization
 

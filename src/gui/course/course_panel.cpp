@@ -23,10 +23,12 @@
 #include <utility>
 #include <vector>
 
+#include <QAction>
 #include <QButtonGroup>
 #include <QComboBox>
 #include <QFile>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QItemSelection>
@@ -54,6 +56,7 @@
 #include "course/course_serialization.h"
 #include "course/course_undo.h"
 #include "gui/course/control_properties_widget.h"
+#include "gui/main_window.h"
 #include "undo/undo.h"
 
 
@@ -115,12 +118,13 @@ protected:
 }  // anonymous namespace
 
 
-CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
-                                     CourseOverlay* overlay, QWidget* parent)
+CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay* overlay,
+                                     MainWindow* main_window, QWidget* parent)
 : QWidget(parent)
 , map(map)
 , db(db)
 , overlay(overlay)
+, main_window(main_window)
 {
     tabs = new QTabWidget(this);
 
@@ -367,13 +371,41 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
 
     import_courses_btn = new QPushButton(tr("Import courses file…"));
     import_courses_btn->setToolTip(
-        tr("Load a previously saved .courses file onto this map, "
-           "replacing the current controls and courses (undoable)"));
+        tr("Load a .courses file onto this map, replacing the current "
+           "controls and courses (undoable). The file becomes this map's "
+           "active course file."));
     connect(import_courses_btn, &QPushButton::clicked,
             this, &CoursePanelWidget::importCoursesFromFile);
 
+    recent_courses_btn = new QToolButton;
+    recent_courses_btn->setText(tr("Recent…"));
+    recent_courses_btn->setToolTip(
+        tr("Reactivate a course file this map was previously associated "
+           "with (e.g. one detached via \"Clear courses from map\")."));
+    connect(recent_courses_btn, &QToolButton::clicked,
+            this, &CoursePanelWidget::showRecentCoursesMenu);
+
+    clear_courses_btn = new QPushButton(tr("Clear courses from map"));
+    clear_courses_btn->setToolTip(
+        tr("Remove all controls and courses from this map, and detach the "
+           "map from its current course file (undoable). The file itself "
+           "is not deleted or renamed — it stays on disk and can be "
+           "reactivated later via \"Recent…\"."));
+    connect(clear_courses_btn, &QPushButton::clicked,
+            this, &CoursePanelWidget::clearCoursesFromMap);
+
+    auto* top_btns_row = new QHBoxLayout;
+    top_btns_row->addWidget(import_courses_btn);
+    top_btns_row->addWidget(recent_courses_btn);
+    top_btns_row->addWidget(clear_courses_btn);
+
+    active_file_label = new QLabel;
+    active_file_label->setWordWrap(true);
+    active_file_label->setStyleSheet(QStringLiteral("color: palette(mid);"));
+
     auto* main_layout = new QVBoxLayout(this);
-    main_layout->addWidget(import_courses_btn);
+    main_layout->addLayout(top_btns_row);
+    main_layout->addWidget(active_file_label);
     main_layout->addWidget(tabs);
     main_layout->setContentsMargins(4, 4, 4, 4);
     setLayout(main_layout);
@@ -391,28 +423,91 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db,
     connect(&db, &CourseDatabase::courseAdded,    this, &CoursePanelWidget::rebuildCoursesList);
     connect(&db, &CourseDatabase::courseChanged,  this, &CoursePanelWidget::rebuildCoursesList);
     connect(&db, &CourseDatabase::courseRemoved,  this, &CoursePanelWidget::rebuildCoursesList);
+    connect(&db, &CourseDatabase::activeFileChanged, this, &CoursePanelWidget::updateActiveFileLabel);
 
     // Initial population
     rebuildControlsTree();
     rebuildCoursesList();
+    updateActiveFileLabel();
 }
 
 
-// ── Import ────────────────────────────────────────────────────────────────────
+// ── Import / active file ─────────────────────────────────────────────────────
 
 void CoursePanelWidget::importCoursesFromFile()
 {
+    const QString map_path = main_window ? main_window->currentPath() : QString();
+    const QString start_dir = map_path.isEmpty() ? QString() : QFileInfo(map_path).path();
     const QString path = QFileDialog::getOpenFileName(
-        this, tr("Import Courses File"), {},
+        this, tr("Import Courses File"), start_dir,
         tr("Course files (*.courses);;All files (*)"));
     if (path.isEmpty())
         return;
 
-    QFile file(path);
+    QString relative_name = path;
+    if (!map_path.isEmpty())
+        relative_name = QFileInfo(map_path).dir().relativeFilePath(path);
+
+    loadCourseFileOntoMap(path, relative_name);
+}
+
+
+void CoursePanelWidget::showRecentCoursesMenu()
+{
+    QMenu menu(this);
+    if (db.recentFiles().isEmpty())
+    {
+        auto* empty_act = menu.addAction(tr("No recent course files"));
+        empty_act->setEnabled(false);
+    }
+    else
+    {
+        const QString map_path = main_window ? main_window->currentPath() : QString();
+        for (const auto& name : db.recentFiles())
+        {
+            const bool is_active = (name == db.activeFile());
+            const auto abs_path = map_path.isEmpty()
+                ? name : CourseSerialization::resolveCourseFilePath(map_path, name);
+            const bool exists = QFile::exists(abs_path);
+
+            auto* act = menu.addAction(is_active ? tr("%1 (active)").arg(name) : name);
+            act->setEnabled(!is_active && exists);
+            if (!exists)
+                act->setToolTip(tr("File not found:\n%1").arg(abs_path));
+            connect(act, &QAction::triggered, this, [this, name] {
+                activateRecentCourseFile(name);
+            });
+        }
+    }
+    menu.exec(recent_courses_btn->mapToGlobal(QPoint(0, recent_courses_btn->height())));
+}
+
+
+void CoursePanelWidget::activateRecentCourseFile(const QString& relative_name)
+{
+    const QString map_path = main_window ? main_window->currentPath() : QString();
+    if (map_path.isEmpty())
+        return;
+
+    const auto abs_path = CourseSerialization::resolveCourseFilePath(map_path, relative_name);
+    if (!QFile::exists(abs_path))
+    {
+        QMessageBox::warning(this, tr("Recent Course Files"),
+            tr("File not found:\n%1").arg(abs_path));
+        return;
+    }
+
+    loadCourseFileOntoMap(abs_path, relative_name);
+}
+
+
+void CoursePanelWidget::loadCourseFileOntoMap(const QString& absolute_path, const QString& relative_name)
+{
+    QFile file(absolute_path);
     if (!file.open(QIODevice::ReadOnly))
     {
         QMessageBox::warning(this, tr("Import Courses"),
-            tr("Cannot open file:\n%1\n%2").arg(path, file.errorString()));
+            tr("Cannot open file:\n%1\n%2").arg(absolute_path, file.errorString()));
         return;
     }
 
@@ -420,7 +515,7 @@ void CoursePanelWidget::importCoursesFromFile()
     if (!xml.readNextStartElement() || xml.name() != QLatin1String("courses"))
     {
         QMessageBox::warning(this, tr("Import Courses"),
-            tr("This file does not contain course data:\n%1").arg(path));
+            tr("This file does not contain course data:\n%1").arg(absolute_path));
         return;
     }
 
@@ -462,6 +557,7 @@ void CoursePanelWidget::importCoursesFromFile()
     const QString event_name_before = db.eventName();
     const bool legend_anchor_valid_before = db.hasLegendAnchor();
     const MapCoordF legend_anchor_before = db.legendAnchor();
+    const QString active_file_before = db.activeFile();
 
     // Clear the current database and replace it with the imported data
     while (db.numCourses() > 0)
@@ -478,10 +574,73 @@ void CoursePanelWidget::importCoursesFromFile()
         db.setLegendAnchor(imported.legendAnchor());
     else
         db.clearLegendAnchor();
+    db.setActiveFile(relative_name);
 
     map.push(new ReplaceCourseDatabaseUndoStep(
         &map, std::move(controls_before), std::move(courses_before),
-        event_name_before, legend_anchor_valid_before, legend_anchor_before));
+        event_name_before, legend_anchor_valid_before, legend_anchor_before,
+        active_file_before));
+}
+
+
+void CoursePanelWidget::updateActiveFileLabel()
+{
+    if (db.activeFile().isEmpty())
+        active_file_label->setText(tr("No course file associated with this map yet."));
+    else
+        active_file_label->setText(tr("Active course file: %1").arg(db.activeFile()));
+}
+
+
+// ── Clear ─────────────────────────────────────────────────────────────────────
+
+void CoursePanelWidget::clearCoursesFromMap()
+{
+    if (db.numControls() == 0 && db.numCourses() == 0 && db.eventName().isEmpty()
+        && db.activeFile().isEmpty())
+    {
+        QMessageBox::information(this, tr("Clear Courses"),
+            tr("There are no controls or courses on this map."));
+        return;
+    }
+
+    const auto reply = QMessageBox::question(
+        this, tr("Clear Courses"),
+        tr("This will remove all controls and courses from the map and detach it "
+           "from its current course file, if any. This can be undone.\n\n"
+           "The file itself is not deleted or renamed — it stays on disk and can "
+           "be reactivated later via \"Recent…\".\n\n"
+           "Continue?"),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (reply != QMessageBox::Yes)
+        return;
+
+    // Snapshot the current database for undo
+    std::vector<CourseControl> controls_before;
+    controls_before.reserve(std::size_t(db.numControls()));
+    for (int i = 0; i < db.numControls(); ++i)
+        controls_before.push_back(db.control(i));
+    auto courses_before = coursesSnapshot();
+    const QString event_name_before = db.eventName();
+    const bool legend_anchor_valid_before = db.hasLegendAnchor();
+    const MapCoordF legend_anchor_before = db.legendAnchor();
+    const QString active_file_before = db.activeFile();
+
+    while (db.numCourses() > 0)
+        db.removeCourse(db.numCourses() - 1);
+    while (db.numControls() > 0)
+        db.removeControl(db.numControls() - 1);
+    db.setEventName({});
+    db.clearLegendAnchor();
+    // Detach only: the name stays in the recent-files history (already
+    // added when it first became active), so a later new course won't
+    // silently reuse — and overwrite — this file's name.
+    db.setActiveFile({});
+
+    map.push(new ReplaceCourseDatabaseUndoStep(
+        &map, std::move(controls_before), std::move(courses_before),
+        event_name_before, legend_anchor_valid_before, legend_anchor_before,
+        active_file_before));
 }
 
 

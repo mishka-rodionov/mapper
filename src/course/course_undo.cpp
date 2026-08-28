@@ -276,13 +276,15 @@ ReplaceCourseDatabaseUndoStep::ReplaceCourseDatabaseUndoStep(
         std::vector<Course> courses_snapshot,
         QString event_name_snapshot,
         bool legend_anchor_valid_snapshot,
-        MapCoordF legend_anchor_snapshot)
+        MapCoordF legend_anchor_snapshot,
+        QString active_file_snapshot)
 : UndoStep(CourseDatabaseReplacedType, map)
 , controls_snapshot(std::move(controls_snapshot))
 , courses_snapshot(std::move(courses_snapshot))
 , event_name_snapshot(std::move(event_name_snapshot))
 , legend_anchor_valid_snapshot(legend_anchor_valid_snapshot)
 , legend_anchor_snapshot(legend_anchor_snapshot)
+, active_file_snapshot(std::move(active_file_snapshot))
 {}
 
 UndoStep* ReplaceCourseDatabaseUndoStep::undo()
@@ -302,7 +304,7 @@ UndoStep* ReplaceCourseDatabaseUndoStep::undo()
 
     auto* redo = new ReplaceCourseDatabaseUndoStep(
         map, std::move(current_controls), std::move(current_courses),
-        db.eventName(), db.hasLegendAnchor(), db.legendAnchor());
+        db.eventName(), db.hasLegendAnchor(), db.legendAnchor(), db.activeFile());
 
     // Clear the database and restore from snapshot
     while (db.numCourses() > 0)
@@ -319,6 +321,7 @@ UndoStep* ReplaceCourseDatabaseUndoStep::undo()
         db.setLegendAnchor(legend_anchor_snapshot);
     else
         db.clearLegendAnchor();
+    db.setActiveFileRaw(active_file_snapshot);
 
     return redo;
 }

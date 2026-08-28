@@ -19,6 +19,8 @@
 
 #include "course_serialization.h"
 
+#include <QDir>
+#include <QFileInfo>
 #include <QLatin1String>
 #include <QtGlobal>
 #include <QXmlStreamReader>
@@ -288,6 +290,43 @@ void load(QXmlStreamReader& xml, CourseDatabase& db)
         }
     }
 }
+
+
+QString coursesSidecarPath(const QString& map_path)
+{
+    return map_path + QLatin1String(".courses");
+}
+
+
+QString defaultCourseFileName(const QString& map_path)
+{
+    return QFileInfo(map_path).fileName() + QLatin1String(".courses");
+}
+
+
+QString resolveCourseFilePath(const QString& map_path, const QString& relative_name)
+{
+    return QFileInfo(map_path).dir().filePath(relative_name);
+}
+
+
+QString pickAvailableCourseFileName(const QString& map_path, const QStringList& taken_names)
+{
+    const auto default_name = defaultCourseFileName(map_path);
+    if (!taken_names.contains(default_name))
+        return default_name;
+
+    const QFileInfo info(default_name);
+    const auto base = info.completeBaseName();  // "MyMap.omap" (strips only ".courses")
+    const auto suffix = QLatin1String(".courses");
+    for (int n = 2; ; ++n)
+    {
+        QString candidate = base + QLatin1Char('-') + QString::number(n) + suffix;
+        if (!taken_names.contains(candidate))
+            return candidate;
+    }
+}
+
 
 }  // namespace CourseSerialization
 

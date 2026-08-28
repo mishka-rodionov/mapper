@@ -20,6 +20,7 @@
 #include "course_database.h"
 
 #include <algorithm>
+#include <utility>
 
 #include <QString>
 
@@ -114,8 +115,8 @@ QString CourseDatabase::generateUniqueId(ControlType type) const
         }
     }
 
-    // Regular / CrossingPoint: find next free integer starting from 101
-    for (int n = 101; ; ++n)
+    // Regular / CrossingPoint: find next free integer starting from 31
+    for (int n = 31; ; ++n)
     {
         QString id = QString::number(n);
         if (!findById(id))
@@ -135,6 +136,31 @@ void CourseDatabase::setLegendAnchor(const MapCoordF& anchor)
 void CourseDatabase::clearLegendAnchor()
 {
     legend_anchor_valid = false;
+}
+
+
+// --- Course file association ---
+
+void CourseDatabase::setActiveFile(const QString& name)
+{
+    active_file = name;
+    if (!name.isEmpty())
+    {
+        recent_files.removeAll(name);
+        recent_files.prepend(name);
+    }
+    emit activeFileChanged();
+}
+
+void CourseDatabase::setActiveFileRaw(const QString& name)
+{
+    active_file = name;
+    emit activeFileChanged();
+}
+
+void CourseDatabase::setRecentFilesRaw(QStringList names)
+{
+    recent_files = std::move(names);
 }
 
 

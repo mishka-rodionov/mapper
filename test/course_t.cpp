@@ -180,7 +180,7 @@ void CourseTest::generateUniqueId()
 
     QCOMPARE(db.generateUniqueId(ControlType::Start),   QStringLiteral("S1"));
     QCOMPARE(db.generateUniqueId(ControlType::Finish),  QStringLiteral("F1"));
-    QCOMPARE(db.generateUniqueId(ControlType::Regular), QStringLiteral("101"));
+    QCOMPARE(db.generateUniqueId(ControlType::Regular), QStringLiteral("31"));
 
     CourseControl s1;
     s1.id   = QStringLiteral("S1");
@@ -188,7 +188,7 @@ void CourseTest::generateUniqueId()
     db.addControl(s1);
 
     QCOMPARE(db.generateUniqueId(ControlType::Start),   QStringLiteral("S2"));
-    QCOMPARE(db.generateUniqueId(ControlType::Regular), QStringLiteral("101"));
+    QCOMPARE(db.generateUniqueId(ControlType::Regular), QStringLiteral("31"));
 }
 
 
@@ -282,14 +282,96 @@ void CourseTest::sidecarFile()
         QCOMPARE(db.control(0).id, QStringLiteral("101"));
     }
 
-    // ── Saving an empty course database removes a stale sidecar file ────────
+    // ── A map with no course-file association never touches unrelated files ──
+    // (A brand new Map object here was never associated with sidecar_path at
+    // all — it must not delete a file it doesn't know about.)
 
     {
         Map map;
         XMLFileExporter exporter{ map_path, &map, nullptr };
         QVERIFY(exporter.doExport());
     }
-    QVERIFY(!QFile::exists(sidecar_path));
+    QVERIFY(QFile::exists(sidecar_path));
+}
+
+
+void CourseTest::courseFileDetachAndReattach()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto map_path = dir.filePath(QStringLiteral("test.omap"));
+    const auto first_file = QStringLiteral("test.omap.courses");
+    const auto second_file = QStringLiteral("test.omap-2.courses");
+
+    // ── Save with content: gets the default name, recorded as active ────────
+
+    {
+        Map map;
+        auto& db = map.courseDatabase();
+        CourseControl ctrl;
+        ctrl.id       = QStringLiteral("101");
+        ctrl.type     = ControlType::Regular;
+        ctrl.position = MapCoord::fromNative(1000, 2000);
+        db.addControl(ctrl);
+
+        XMLFileExporter exporter{ map_path, &map, nullptr };
+        QVERIFY(exporter.doExport());
+        QCOMPARE(exporter.warnings().size(), std::size_t(0));
+    }
+    QVERIFY(QFile::exists(dir.filePath(first_file)));
+
+    // ── Reload, detach (clear active + content), save: file is untouched ────
+
+    Map map;
+    {
+        XMLFileImporter importer{ map_path, &map, nullptr };
+        QVERIFY(importer.doImport());
+        auto& db = map.courseDatabase();
+        QCOMPARE(db.activeFile(), first_file);
+        QCOMPARE(db.numControls(), 1);
+
+        while (db.numControls() > 0)
+            db.removeControl(db.numControls() - 1);
+        db.setActiveFile({});  // detach, keep first_file in history
+
+        QCOMPARE(db.activeFile(), QString());
+        QVERIFY(db.recentFiles().contains(first_file));
+    }
+
+    {
+        XMLFileExporter exporter{ map_path, &map, nullptr };
+        QVERIFY(exporter.doExport());
+    }
+    // The detached file must survive untouched (still has its content).
+    QVERIFY(QFile::exists(dir.filePath(first_file)));
+    {
+        QFile old_file{ dir.filePath(first_file) };
+        QVERIFY(old_file.open(QIODevice::ReadOnly));
+        QVERIFY(old_file.readAll().contains("101"));
+    }
+
+    // ── New content after detach picks a non-colliding name ──────────────────
+
+    {
+        auto& db = map.courseDatabase();
+        CourseControl ctrl;
+        ctrl.id       = QStringLiteral("102");
+        ctrl.type     = ControlType::Regular;
+        ctrl.position = MapCoord::fromNative(3000, 4000);
+        db.addControl(ctrl);
+        // No path-aware auto-naming here (CourseFeature does that in the
+        // GUI layer); the exporter's own fallback must still find a free
+        // name rather than colliding with first_file.
+
+        XMLFileExporter exporter{ map_path, &map, nullptr };
+        QVERIFY(exporter.doExport());
+    }
+    QVERIFY(QFile::exists(dir.filePath(second_file)));
+    {
+        QFile new_file{ dir.filePath(second_file) };
+        QVERIFY(new_file.open(QIODevice::ReadOnly));
+        QVERIFY(new_file.readAll().contains("102"));
+    }
 }
 
 

@@ -88,6 +88,14 @@ private slots:
     void onControlSelectedInTool(const QString& control_id);
     void onNextControlTypeChangeRequested(ControlType type);
 
+    /**
+     * Assigns a course file name to the database as soon as it gains
+     * content (a control, a course, or an event name) while it doesn't
+     * have one yet, so a freshly-drawn course persists automatically on
+     * save without requiring an explicit "Import"/"Save as" step.
+     */
+    void ensureActiveCourseFileName();
+
 private:
     void createDockWidget();
 

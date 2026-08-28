@@ -185,7 +185,8 @@ public:
                                   std::vector<Course> courses_snapshot,
                                   QString event_name_snapshot,
                                   bool legend_anchor_valid_snapshot,
-                                  MapCoordF legend_anchor_snapshot);
+                                  MapCoordF legend_anchor_snapshot,
+                                  QString active_file_snapshot = {});
     ~ReplaceCourseDatabaseUndoStep() override = default;
 
     UndoStep* undo() override;
@@ -199,6 +200,7 @@ private:
     QString                    event_name_snapshot;
     bool                       legend_anchor_valid_snapshot;
     MapCoordF                  legend_anchor_snapshot;
+    QString                    active_file_snapshot;
 };
 
 
