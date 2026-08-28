@@ -9222,6 +9222,24 @@ Location: %2</source>
         <source>Older versions of Mapper do not support multiple map parts. To save the map in compatibility mode, you must first merge all map parts.</source>
         <translation>Предыдущие версии Mapper не поддерживают многослойные карты. Для сохранения карты в совместимом формате Вы должны сначала объединить все слои карты.</translation>
     </message>
+    <message>
+        <location filename="../src/fileformats/xml_file_format.cpp" line="593"/>
+        <source>Cannot open courses file
+%1:
+%2</source>
+        <translation>Не удалось открыть файл дистанций
+%1:
+%2</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/xml_file_format.cpp" line="604"/>
+        <source>Cannot save courses file
+%1:
+%2</source>
+        <translation>Не удалось сохранить файл дистанций
+%1:
+%2</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::XMLFileImporter</name>
@@ -9300,6 +9318,37 @@ Location: %2</source>
         <location filename="../src/fileformats/xml_file_format.cpp" line="984"/>
         <source>Expected %1 map parts, found %2.</source>
         <translation>Ожидалось %1 слоя(ёв) карты, найдено %2.</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/xml_file_format.cpp" line="1254"/>
+        <source>Courses file not found:
+%1</source>
+        <translation>Файл дистанций не найден:
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/xml_file_format.cpp" line="1260"/>
+        <source>Cannot open courses file
+%1:
+%2</source>
+        <translation>Не удалось открыть файл дистанций
+%1:
+%2</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/xml_file_format.cpp" line="1267"/>
+        <source>Invalid courses file: %1</source>
+        <translation>Некорректный файл дистанций: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/xml_file_format.cpp" line="1277"/>
+        <source>Error while loading courses from %1 at %2:%3: %4</source>
+        <translation>Ошибка при загрузке дистанций из %1 в %2:%3: %4</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/xml_file_format.cpp" line="1282"/>
+        <source>Error while loading courses from %1: %2</source>
+        <translation>Ошибка при загрузке дистанций из %1: %2</translation>
     </message>
 </context>
 <context>
@@ -9479,6 +9528,278 @@ Location: %2</source>
         <source>New name:</source>
         <translation>Новое название:</translation>
     </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="192"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="767"/>
+        <source>No controls selected</source>
+        <translation>КП не выбраны</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="196"/>
+        <source>Add</source>
+        <translation>Добавить</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="198"/>
+        <source>Add all selected controls (Start/Finish/Regular/Crossing) to the chosen course</source>
+        <translation>Добавить все выбранные КП (старт/финиш/обычный/точка пересечения) в выбранную дистанцию</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="207"/>
+        <source>Add to course:</source>
+        <translation>Добавить в дистанцию:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="232"/>
+        <source>+</source>
+        <translation>+</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="234"/>
+        <source>-</source>
+        <translation>-</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="251"/>
+        <source>Linear (fixed order)</source>
+        <translation>Линейная (фиксированный порядок)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="252"/>
+        <source>Score (choice)</source>
+        <translation>С баллами (свободный порядок)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="254"/>
+        <source>Linear: controls must be visited in the listed order.
+Score: controls may be taken in any order, each worth points.</source>
+        <translation>Линейная: КП нужно проходить в указанном порядке.
+С баллами: КП можно брать в любом порядке, каждый КП даёт баллы.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="262"/>
+        <source>Type:</source>
+        <translation>Тип:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="271"/>
+        <source>Up</source>
+        <translation>Вверх</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="272"/>
+        <source>Down</source>
+        <translation>Вниз</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="273"/>
+        <source>Add the controls selected in the Controls tab to this course</source>
+        <translation>Добавить КП, выбранные во вкладке «КП», к этой дистанции</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="274"/>
+        <source>Remove the selected entries from this course</source>
+        <translation>Удалить выбранные пункты из дистанции</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="289"/>
+        <source>Points:</source>
+        <translation>Баллы:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="292"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="341"/>
+        <source> pts</source>
+        <translation> б.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="293"/>
+        <source>Score awarded for taking this control (Score courses only)</source>
+        <translation>Баллы за взятие этого КП (только для дистанций с баллами)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="322"/>
+        <source>Legend scale:</source>
+        <translation>Масштаб легенды:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="326"/>
+        <source> %</source>
+        <translation> %</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="327"/>
+        <source>Scale of the control description table drawn on the map</source>
+        <translation>Масштаб таблицы легенды КП, отображаемой на карте</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="338"/>
+        <source>Default points:</source>
+        <translation>Баллы по умолчанию:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="343"/>
+        <source>Score assigned automatically to newly added controls in this course</source>
+        <translation>Баллы, присваиваемые автоматически новым КП в этой дистанции</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="372"/>
+        <source>Import courses file…</source>
+        <translation>Импорт файла дистанций…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="374"/>
+        <source>Load a .courses file onto this map, replacing the current controls and courses (undoable). The file becomes this map&apos;s active course file.</source>
+        <translation>Загрузить файл .courses на эту карту, заменив текущие КП и дистанции (можно отменить). Этот файл станет активным файлом дистанций для карты.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="381"/>
+        <source>Recent…</source>
+        <translation>Недавние…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="383"/>
+        <source>Reactivate a course file this map was previously associated with (e.g. one detached via &quot;Clear courses from map&quot;).</source>
+        <translation>Повторно подключить файл дистанций, с которым карта была связана ранее (например, отсоединённый через «Очистить дистанции с карты»).</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="388"/>
+        <source>Clear courses from map</source>
+        <translation>Очистить дистанции с карты</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="390"/>
+        <source>Remove all controls and courses from this map, and detach the map from its current course file (undoable). The file itself is not deleted or renamed — it stays on disk and can be reactivated later via &quot;Recent…&quot;.</source>
+        <translation>Удалить все КП и дистанции с этой карты и отсоединить карту от текущего файла дистанций (можно отменить). Сам файл не удаляется и не переименовывается — он остаётся на диске, и его можно снова подключить позже через «Недавние…».</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="442"/>
+        <source>Import Courses File</source>
+        <translation>Импорт файла дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="443"/>
+        <source>Course files (*.courses);;All files (*)</source>
+        <translation>Файлы дистанций (*.courses);;Все файлы (*)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="460"/>
+        <source>No recent course files</source>
+        <translation>Нет недавних файлов дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="473"/>
+        <source>%1 (active)</source>
+        <translation>%1 (активен)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="476"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="496"/>
+        <source>File not found:
+%1</source>
+        <translation>Файл не найден:
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="495"/>
+        <source>Recent Course Files</source>
+        <translation>Недавние файлы дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="509"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="517"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="528"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="534"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="542"/>
+        <source>Import Courses</source>
+        <translation>Импорт дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="510"/>
+        <source>Cannot open file:
+%1
+%2</source>
+        <translation>Не удалось открыть файл:
+%1
+%2</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="518"/>
+        <source>This file does not contain course data:
+%1</source>
+        <translation>Этот файл не содержит данных дистанций:
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="529"/>
+        <source>Failed to read course data:
+%1</source>
+        <translation>Не удалось прочитать данные дистанций:
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="535"/>
+        <source>The selected file does not contain any controls or courses.</source>
+        <translation>Выбранный файл не содержит ни КП, ни дистанций.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="543"/>
+        <source>This will replace all controls and courses currently on the map with the contents of the selected file. This can be undone.
+
+Continue?</source>
+        <translation>Это заменит все КП и дистанции на карте содержимым выбранного файла. Это можно отменить.
+
+Продолжить?</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="589"/>
+        <source>No course file associated with this map yet.</source>
+        <translation>С этой картой пока не связан файл дистанций.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="591"/>
+        <source>Active course file: %1</source>
+        <translation>Активный файл дистанций: %1</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="602"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="608"/>
+        <source>Clear Courses</source>
+        <translation>Очистка дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="603"/>
+        <source>There are no controls or courses on this map.</source>
+        <translation>На этой карте нет КП или дистанций.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="609"/>
+        <source>This will remove all controls and courses from the map and detach it from its current course file, if any. This can be undone.
+
+The file itself is not deleted or renamed — it stays on disk and can be reactivated later via &quot;Recent…&quot;.
+
+Continue?</source>
+        <translation>Это удалит все КП и дистанции с карты и отсоединит её от текущего файла дистанций, если он есть. Это можно отменить.
+
+Сам файл не удаляется и не переименовывается — он остаётся на диске, и его можно снова подключить позже через «Недавние…».
+
+Продолжить?</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="731"/>
+        <source>Delete %1 controls</source>
+        <translation>Удалить %1 КП</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="780"/>
+        <source>Selected (%1): %2</source>
+        <translation>Выбрано (%1): %2</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="874"/>
+        <source>%1 pts</source>
+        <translation>%1 б.</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::CourseFeature</name>
@@ -9529,6 +9850,11 @@ Location: %2</source>
         <location filename="../src/gui/course/course_feature.cpp" line="201"/>
         <source>Course Planning</source>
         <translation>Планирование дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="81"/>
+        <source>ISCD Symbol &amp;Reference…</source>
+        <translation>Справочник символов &amp;ISCD…</translation>
     </message>
 </context>
 <context>
@@ -9988,6 +10314,60 @@ Location: %2</source>
             <numerusform>%n контрольных пункта</numerusform>
             <numerusform>%n контрольных пунктов</numerusform>
         </translation>
+    </message>
+    <message>
+        <location filename="../src/course/course_overlay.cpp" line="997"/>
+        <source>%1 km</source>
+        <translation>%1 км</translation>
+    </message>
+    <message>
+        <location filename="../src/course/course_overlay.cpp" line="999"/>
+        <source>%1 m</source>
+        <translation>%1 м</translation>
+    </message>
+    <message>
+        <location filename="../src/course/course_overlay.cpp" line="1005"/>
+        <source>Climb %1 m</source>
+        <translation>Набор высоты %1 м</translation>
+    </message>
+</context>
+<context>
+    <name>OpenOrienteering::ISCDSymbolBrowser</name>
+    <message>
+        <location filename="../src/gui/course/iscd_symbol_browser.cpp" line="292"/>
+        <source>ISCD Symbol Reference</source>
+        <translation>Справочник символов ISCD</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/iscd_symbol_browser.cpp" line="300"/>
+        <source>Symbol Editor…</source>
+        <translation>Редактор символов…</translation>
+    </message>
+</context>
+<context>
+    <name>OpenOrienteering::IofCourseExportFull</name>
+    <message>
+        <location filename="../src/fileformats/iof_course_export_full.cpp" line="68"/>
+        <source>The course database is empty. Use the Course Planning panel to add controls and courses.</source>
+        <translation>База данных дистанций пуста. Используйте панель планирования дистанций, чтобы добавить КП и дистанции.</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/iof_course_export_full.cpp" line="99"/>
+        <source>Unnamed event</source>
+        <translation>Событие без названия</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/iof_course_export_full.cpp" line="118"/>
+        <source>The map has no valid georeferencing. Control positions will be omitted from the export.</source>
+        <translation>У карты нет корректной геопривязки. Позиции КП будут исключены из экспорта.</translation>
+    </message>
+</context>
+<context>
+    <name>ImportExport</name>
+    <message>
+        <location filename="../src/fileformats/iof_course_export_full.cpp" line="45"/>
+        <source>IOF Data Standard 3.0 (Full course database)</source>
+        <translation>IOF Data Standard 3.0 (полная база дистанций)</translation>
     </message>
 </context>
 </TS>

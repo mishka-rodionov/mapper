@@ -297,7 +297,7 @@ ISCDSymbolBrowser::ISCDSymbolBrowser(QWidget* parent)
     scroll->setWidget(canvas);
     scroll->setWidgetResizable(false);
 
-    auto* editBtn = new QPushButton(tr("Редактор символов…"), this);
+    auto* editBtn = new QPushButton(tr("Symbol Editor…"), this);
     connect(editBtn, &QPushButton::clicked, this, [this, canvas]{
         auto* ed = new ISCDSymbolEditor(this);
         ed->setAttribute(Qt::WA_DeleteOnClose);
