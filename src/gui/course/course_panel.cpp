@@ -38,6 +38,7 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPalette>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStringList>
@@ -401,7 +402,13 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
 
     active_file_label = new QLabel;
     active_file_label->setWordWrap(true);
-    active_file_label->setStyleSheet(QStringLiteral("color: palette(mid);"));
+    {
+        // Dim the label like disabled text, adapting to light/dark themes
+        // (a fixed "palette(mid)" style color is unreadable in dark mode).
+        QPalette pal = active_file_label->palette();
+        pal.setColor(QPalette::WindowText, pal.color(QPalette::Disabled, QPalette::WindowText));
+        active_file_label->setPalette(pal);
+    }
 
     auto* main_layout = new QVBoxLayout(this);
     main_layout->addLayout(top_btns_row);
