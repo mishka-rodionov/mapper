@@ -201,6 +201,8 @@ void IofCourseExportFull::writeCourse(const Course& course, const CourseDatabase
         XmlElementWriter cc(*xml, QLatin1String("CourseControl"));
         cc.writeAttribute(QLatin1String("type"), type_str);
         xml->writeTextElement(QLatin1String("Control"), entry.control_id);
+        if (course.type == CourseType::Score && type_str == QLatin1String("Control"))
+            xml->writeTextElement(QLatin1String("Score"), QString::number(entry.points));
     }
 }
 
