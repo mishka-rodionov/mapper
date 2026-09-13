@@ -98,7 +98,7 @@ Per the project memory: don't manually UI-test Mapper — just build with ninja 
 |---|---|---|
 | **eSport** (backend) | `/Users/rodionov/backend_projects/eSport` | Ktor-сервер, парсит IOF XML, загруженный клиентами |
 | **competra-android** | `/Users/rodionov/android_projects/competra-android` | Android-клиент, загружает IOF XML на сервер |
-| **competra-web** | `/Users/rodionov/web_projects/competra-web` | Веб-клиент, загружает IOF XML на сервер |
+| **competra-web-ts** | `/Users/rodionov/web_projects/competra-web-ts` | Веб-клиент (React + TypeScript), загружает IOF XML на сервер. Заменил собой прежний Kotlin/Wasm веб-клиент (`competra-web`, теперь архивный) |
 
 ### Правила для Claude
 
@@ -106,7 +106,7 @@ Per the project memory: don't manually UI-test Mapper — just build with ninja 
 
 ### Цепочка использования
 1. Пользователь создаёт дистанции в Mapper и экспортирует их в IOF XML
-2. Файл загружается через `POST /event/orienteering/import/courses` — либо с Android (`DistanceRepository.importFromXml` в `:data:remote`), либо через Web (`shared/data/repository/DistanceRepository.importFromXml`)
+2. Файл загружается через `POST /event/orienteering/import/courses` — либо с Android (`DistanceRepository.importFromXml` в `:data:remote`), либо через Web (`src/api/distanceRepository.ts` → `importFromXml` в `competra-web-ts`)
 3. eSport парсит файл через `data/util/IOFXmlParser.kt` и сохраняет дистанции в БД
 
 Mapper сам по себе не обращается к API eSport — связь только через файловый формат IOF XML.
