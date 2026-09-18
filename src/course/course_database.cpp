@@ -125,17 +125,38 @@ QString CourseDatabase::generateUniqueId(ControlType type) const
 }
 
 
-// --- Legend anchor ---
+// --- Legend block anchors ---
 
-void CourseDatabase::setLegendAnchor(const MapCoordF& anchor)
+bool CourseDatabase::hasLegendBlockAnchor(int index) const
 {
-    legend_anchor = anchor;
-    legend_anchor_valid = true;
+    return index >= 0 && index < static_cast<int>(legend_block_anchor_valid.size())
+        && legend_block_anchor_valid[std::size_t(index)];
 }
 
-void CourseDatabase::clearLegendAnchor()
+MapCoordF CourseDatabase::legendBlockAnchor(int index) const
 {
-    legend_anchor_valid = false;
+    if (index < 0 || index >= static_cast<int>(legend_block_anchors.size()))
+        return {};
+    return legend_block_anchors[std::size_t(index)];
+}
+
+void CourseDatabase::setLegendBlockAnchor(int index, const MapCoordF& anchor)
+{
+    if (index < 0)
+        return;
+    if (static_cast<int>(legend_block_anchors.size()) <= index)
+    {
+        legend_block_anchors.resize(std::size_t(index) + 1);
+        legend_block_anchor_valid.resize(std::size_t(index) + 1, false);
+    }
+    legend_block_anchors[std::size_t(index)] = anchor;
+    legend_block_anchor_valid[std::size_t(index)] = true;
+}
+
+void CourseDatabase::clearLegendAnchors()
+{
+    legend_block_anchors.clear();
+    legend_block_anchor_valid.clear();
 }
 
 

@@ -114,6 +114,7 @@ private slots:
     void onClimbValueChanged(int value);
     void onLegendScaleValueChanged(int value);
     void onLegendScaleChangeRequested(double scale, bool commit);
+    void onLegendColumnsValueChanged(int value);
     void removeEntryFromCourse();
     void moveEntryUp();
     void moveEntryDown();
@@ -184,6 +185,8 @@ private:
     QSpinBox*     climb_spinbox   = nullptr;
     QLabel*       legend_scale_label   = nullptr;
     QSpinBox*     legend_scale_spinbox = nullptr;
+    QLabel*       legend_columns_label   = nullptr;
+    QSpinBox*     legend_columns_spinbox = nullptr;
     QLabel*       default_points_label   = nullptr;
     QSpinBox*     default_points_spinbox = nullptr;
 

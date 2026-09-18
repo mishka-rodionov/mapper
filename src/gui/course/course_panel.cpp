@@ -80,8 +80,8 @@ double boundedDescriptionScale(double scale)
 {
     if (!(scale > 0.0))
         return 1.0;
-    if (scale < 0.25)
-        return 0.25;
+    if (scale < 0.05)
+        return 0.05;
     if (scale > 2.0)
         return 2.0;
     return scale;
@@ -90,6 +90,30 @@ double boundedDescriptionScale(double scale)
 int descriptionScaleToPercent(double scale)
 {
     return static_cast<int>(boundedDescriptionScale(scale) * 100.0 + 0.5);
+}
+
+/** Snapshots every legend block anchor of db, for ReplaceCourseDatabaseUndoStep. */
+void snapshotLegendAnchors(const CourseDatabase& db, std::vector<bool>& valid, std::vector<MapCoordF>& anchors)
+{
+    const int count = db.legendBlockAnchorCount();
+    valid.reserve(std::size_t(count));
+    anchors.reserve(std::size_t(count));
+    for (int i = 0; i < count; ++i)
+    {
+        valid.push_back(db.hasLegendBlockAnchor(i));
+        anchors.push_back(db.legendBlockAnchor(i));
+    }
+}
+
+/** Copies every legend block anchor from one database to another. */
+void copyLegendAnchors(const CourseDatabase& from, CourseDatabase& to)
+{
+    to.clearLegendAnchors();
+    for (int i = 0; i < from.legendBlockAnchorCount(); ++i)
+    {
+        if (from.hasLegendBlockAnchor(i))
+            to.setLegendBlockAnchor(i, from.legendBlockAnchor(i));
+    }
 }
 
 /**
@@ -322,7 +346,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
 
         legend_scale_label = new QLabel(tr("Legend scale:"));
         legend_scale_spinbox = new QSpinBox;
-        legend_scale_spinbox->setRange(25, 200);
+        legend_scale_spinbox->setRange(5, 200);
         legend_scale_spinbox->setSingleStep(5);
         legend_scale_spinbox->setSuffix(tr(" %"));
         legend_scale_spinbox->setToolTip(tr("Scale of the control description table drawn on the map"));
@@ -335,6 +359,22 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         auto* legend_scale_row = new QHBoxLayout;
         legend_scale_row->addWidget(legend_scale_label);
         legend_scale_row->addWidget(legend_scale_spinbox, 1);
+
+        legend_columns_label = new QLabel(tr("Legend columns:"));
+        legend_columns_spinbox = new QSpinBox;
+        legend_columns_spinbox->setRange(1, 6);
+        legend_columns_spinbox->setToolTip(
+            tr("Split the control description table into this many side-by-side blocks "
+               "(useful for courses with many controls)"));
+        legend_columns_spinbox->setEnabled(false);
+        legend_columns_label->setEnabled(false);
+
+        connect(legend_columns_spinbox, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &CoursePanelWidget::onLegendColumnsValueChanged);
+
+        auto* legend_columns_row = new QHBoxLayout;
+        legend_columns_row->addWidget(legend_columns_label);
+        legend_columns_row->addWidget(legend_columns_spinbox, 1);
 
         default_points_label   = new QLabel(tr("Default points:"));
         default_points_spinbox = new QSpinBox;
@@ -359,6 +399,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         layout->addLayout(course_type_row);
         layout->addLayout(climb_row);
         layout->addLayout(legend_scale_row);
+        layout->addLayout(legend_columns_row);
         layout->addLayout(default_points_row);
         layout->addWidget(new QLabel(tr("Entries:")));
         layout->addWidget(entries_list, 3);
@@ -562,8 +603,9 @@ void CoursePanelWidget::loadCourseFileOntoMap(const QString& absolute_path, cons
         controls_before.push_back(db.control(i));
     auto courses_before = coursesSnapshot();
     const QString event_name_before = db.eventName();
-    const bool legend_anchor_valid_before = db.hasLegendAnchor();
-    const MapCoordF legend_anchor_before = db.legendAnchor();
+    std::vector<bool> legend_anchor_valid_before;
+    std::vector<MapCoordF> legend_anchor_before;
+    snapshotLegendAnchors(db, legend_anchor_valid_before, legend_anchor_before);
     const QString active_file_before = db.activeFile();
 
     // Clear the current database and replace it with the imported data
@@ -577,15 +619,12 @@ void CoursePanelWidget::loadCourseFileOntoMap(const QString& absolute_path, cons
     for (int i = 0; i < imported.numCourses(); ++i)
         db.addCourse(imported.course(i));
     db.setEventName(imported.eventName());
-    if (imported.hasLegendAnchor())
-        db.setLegendAnchor(imported.legendAnchor());
-    else
-        db.clearLegendAnchor();
+    copyLegendAnchors(imported, db);
     db.setActiveFile(relative_name);
 
     map.push(new ReplaceCourseDatabaseUndoStep(
         &map, std::move(controls_before), std::move(courses_before),
-        event_name_before, legend_anchor_valid_before, legend_anchor_before,
+        event_name_before, std::move(legend_anchor_valid_before), std::move(legend_anchor_before),
         active_file_before));
 }
 
@@ -629,8 +668,9 @@ void CoursePanelWidget::clearCoursesFromMap()
         controls_before.push_back(db.control(i));
     auto courses_before = coursesSnapshot();
     const QString event_name_before = db.eventName();
-    const bool legend_anchor_valid_before = db.hasLegendAnchor();
-    const MapCoordF legend_anchor_before = db.legendAnchor();
+    std::vector<bool> legend_anchor_valid_before;
+    std::vector<MapCoordF> legend_anchor_before;
+    snapshotLegendAnchors(db, legend_anchor_valid_before, legend_anchor_before);
     const QString active_file_before = db.activeFile();
 
     while (db.numCourses() > 0)
@@ -638,7 +678,7 @@ void CoursePanelWidget::clearCoursesFromMap()
     while (db.numControls() > 0)
         db.removeControl(db.numControls() - 1);
     db.setEventName({});
-    db.clearLegendAnchor();
+    db.clearLegendAnchors();
     // Detach only: the name stays in the recent-files history (already
     // added when it first became active), so a later new course won't
     // silently reuse — and overwrite — this file's name.
@@ -646,7 +686,7 @@ void CoursePanelWidget::clearCoursesFromMap()
 
     map.push(new ReplaceCourseDatabaseUndoStep(
         &map, std::move(controls_before), std::move(courses_before),
-        event_name_before, legend_anchor_valid_before, legend_anchor_before,
+        event_name_before, std::move(legend_anchor_valid_before), std::move(legend_anchor_before),
         active_file_before));
 }
 
@@ -899,6 +939,8 @@ void CoursePanelWidget::onCourseSelectionChanged()
     climb_label->setEnabled(idx >= 0);
     legend_scale_spinbox->setEnabled(idx >= 0);
     legend_scale_label->setEnabled(idx >= 0);
+    legend_columns_spinbox->setEnabled(idx >= 0);
+    legend_columns_label->setEnabled(idx >= 0);
     course_type_combo->setEnabled(idx >= 0);
     const bool is_score = idx >= 0 && db.course(idx).type == CourseType::Score;
     default_points_spinbox->setEnabled(is_score);
@@ -908,6 +950,7 @@ void CoursePanelWidget::onCourseSelectionChanged()
         const auto& c = db.course(idx);
         climb_spinbox->setValue(c.climb_m);
         legend_scale_spinbox->setValue(descriptionScaleToPercent(c.description_scale));
+        legend_columns_spinbox->setValue(c.description_columns);
         default_points_spinbox->setValue(c.default_points);
         const int type_index = course_type_combo->findData(static_cast<int>(c.type));
         if (type_index >= 0 && course_type_combo->currentIndex() != type_index)
@@ -916,6 +959,7 @@ void CoursePanelWidget::onCourseSelectionChanged()
     else
     {
         legend_scale_spinbox->setValue(100);
+        legend_columns_spinbox->setValue(1);
     }
     rebuilding = false;
 
@@ -948,6 +992,20 @@ void CoursePanelWidget::onLegendScaleValueChanged(int value)
         return;
 
     updated.description_scale = scale;
+    db.updateCourse(idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+}
+
+void CoursePanelWidget::onLegendColumnsValueChanged(int value)
+{
+    const int idx = selectedCourseIndex();
+    if (idx < 0 || rebuilding)
+        return;
+    auto snapshot = coursesSnapshot();
+    auto updated  = db.course(idx);
+    if (updated.description_columns == value)
+        return;
+    updated.description_columns = value;
     db.updateCourse(idx, std::move(updated));
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
 }

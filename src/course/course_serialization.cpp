@@ -58,8 +58,19 @@ static const QLatin1String attr_climb        ("climb");
 static const QLatin1String attr_points       ("points");
 static const QLatin1String attr_default_points("default_points");
 static const QLatin1String attr_description_scale("description_scale");
-static const QLatin1String attr_legend_x         ("legend_x");
-static const QLatin1String attr_legend_y         ("legend_y");
+static const QLatin1String attr_description_columns("description_columns");
+// Legend block anchor attribute names: block 0 keeps the legacy "legend_x"/"legend_y"
+// names (for file compatibility); later blocks use "legend2_x"/"legend2_y" and so on.
+QString legendAnchorAttrX(int block_index)
+{
+    return block_index == 0 ? QStringLiteral("legend_x")
+                             : QStringLiteral("legend%1_x").arg(block_index + 1);
+}
+QString legendAnchorAttrY(int block_index)
+{
+    return block_index == 0 ? QStringLiteral("legend_y")
+                             : QStringLiteral("legend%1_y").arg(block_index + 1);
+}
 
 // ControlDescription attributes
 static const QLatin1String attr_code         ("code");
@@ -71,8 +82,9 @@ static const QLatin1String attr_location     ("location");
 static const QLatin1String attr_other        ("other");
 
 constexpr int current_courses_version = 1;
-constexpr double min_description_scale = 0.25;
+constexpr double min_description_scale = 0.05;
 constexpr double max_description_scale = 2.0;
+constexpr int max_description_columns = 6;
 
 
 QString controlTypeToString(ControlType t)
@@ -148,6 +160,8 @@ void saveCourse(QXmlStreamWriter& xml, const Course& c)
         elem.writeAttribute(attr_climb, c.climb_m);
     if (c.description_scale != 1.0)
         elem.writeAttribute(attr_description_scale, c.description_scale);
+    if (c.description_columns != 1)
+        elem.writeAttribute(attr_description_columns, c.description_columns);
     if (c.type == CourseType::Score)
         elem.writeAttribute(attr_default_points, c.default_points);
     for (const auto& entry : c.entries)
@@ -212,6 +226,10 @@ Course loadCourse(QXmlStreamReader& xml)
     const double scale = attrs.value(attr_description_scale).toDouble(&scale_ok);
     if (scale_ok && scale > 0.0)
         c.description_scale = qBound(min_description_scale, scale, max_description_scale);
+    bool columns_ok = false;
+    const int columns = attrs.value(attr_description_columns).toInt(&columns_ok);
+    if (columns_ok && columns > 0)
+        c.description_columns = qBound(1, columns, max_description_columns);
     bool dp_ok = false;
     const int default_points = attrs.value(attr_default_points).toInt(&dp_ok);
     if (dp_ok && default_points > 0)
@@ -246,10 +264,16 @@ void save(QXmlStreamWriter& xml, const CourseDatabase& db)
     courses_elem.writeAttribute(attr_version, current_courses_version);
     if (!db.eventName().isEmpty())
         courses_elem.writeAttribute(attr_event, db.eventName());
-    if (db.hasLegendAnchor())
+    // Attribute names for blocks beyond the first are built dynamically, so these
+    // go through the QXmlStreamWriter directly rather than the QLatin1String-only
+    // XmlElementWriter::writeAttribute() overloads.
+    for (int i = 0; i < db.legendBlockAnchorCount(); ++i)
     {
-        courses_elem.writeAttribute(attr_legend_x, db.legendAnchor().x());
-        courses_elem.writeAttribute(attr_legend_y, db.legendAnchor().y());
+        if (!db.hasLegendBlockAnchor(i))
+            continue;
+        const auto anchor = db.legendBlockAnchor(i);
+        xml.writeAttribute(legendAnchorAttrX(i), QString::number(anchor.x()));
+        xml.writeAttribute(legendAnchorAttrY(i), QString::number(anchor.y()));
     }
 
     for (int i = 0; i < db.numControls(); ++i)
@@ -266,13 +290,15 @@ void load(QXmlStreamReader& xml, CourseDatabase& db)
     const auto attrs = xml.attributes();
     db.setEventName(attrs.value(attr_event).toString());
 
-    bool lx_ok = false, ly_ok = false;
-    const double lx = attrs.value(attr_legend_x).toDouble(&lx_ok);
-    const double ly = attrs.value(attr_legend_y).toDouble(&ly_ok);
-    if (lx_ok && ly_ok)
-        db.setLegendAnchor(MapCoordF(lx, ly));
-    else
-        db.clearLegendAnchor();
+    db.clearLegendAnchors();
+    for (int i = 0; i < max_description_columns; ++i)
+    {
+        bool lx_ok = false, ly_ok = false;
+        const double lx = attrs.value(legendAnchorAttrX(i)).toDouble(&lx_ok);
+        const double ly = attrs.value(legendAnchorAttrY(i)).toDouble(&ly_ok);
+        if (lx_ok && ly_ok)
+            db.setLegendBlockAnchor(i, MapCoordF(lx, ly));
+    }
 
     while (xml.readNextStartElement())
     {

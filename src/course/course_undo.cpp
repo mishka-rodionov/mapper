@@ -275,15 +275,15 @@ ReplaceCourseDatabaseUndoStep::ReplaceCourseDatabaseUndoStep(
         std::vector<CourseControl> controls_snapshot,
         std::vector<Course> courses_snapshot,
         QString event_name_snapshot,
-        bool legend_anchor_valid_snapshot,
-        MapCoordF legend_anchor_snapshot,
+        std::vector<bool> legend_anchor_valid_snapshot,
+        std::vector<MapCoordF> legend_anchor_snapshot,
         QString active_file_snapshot)
 : UndoStep(CourseDatabaseReplacedType, map)
 , controls_snapshot(std::move(controls_snapshot))
 , courses_snapshot(std::move(courses_snapshot))
 , event_name_snapshot(std::move(event_name_snapshot))
-, legend_anchor_valid_snapshot(legend_anchor_valid_snapshot)
-, legend_anchor_snapshot(legend_anchor_snapshot)
+, legend_anchor_valid_snapshot(std::move(legend_anchor_valid_snapshot))
+, legend_anchor_snapshot(std::move(legend_anchor_snapshot))
 , active_file_snapshot(std::move(active_file_snapshot))
 {}
 
@@ -302,9 +302,21 @@ UndoStep* ReplaceCourseDatabaseUndoStep::undo()
     for (int i = 0; i < db.numCourses(); ++i)
         current_courses.push_back(db.course(i));
 
+    std::vector<bool> current_legend_valid;
+    std::vector<MapCoordF> current_legend_anchor;
+    const int legend_count = db.legendBlockAnchorCount();
+    current_legend_valid.reserve(std::size_t(legend_count));
+    current_legend_anchor.reserve(std::size_t(legend_count));
+    for (int i = 0; i < legend_count; ++i)
+    {
+        current_legend_valid.push_back(db.hasLegendBlockAnchor(i));
+        current_legend_anchor.push_back(db.legendBlockAnchor(i));
+    }
+
     auto* redo = new ReplaceCourseDatabaseUndoStep(
         map, std::move(current_controls), std::move(current_courses),
-        db.eventName(), db.hasLegendAnchor(), db.legendAnchor(), db.activeFile());
+        db.eventName(), std::move(current_legend_valid), std::move(current_legend_anchor),
+        db.activeFile());
 
     // Clear the database and restore from snapshot
     while (db.numCourses() > 0)
@@ -317,10 +329,12 @@ UndoStep* ReplaceCourseDatabaseUndoStep::undo()
     for (auto& c : courses_snapshot)
         db.addCourse(c);
     db.setEventName(event_name_snapshot);
-    if (legend_anchor_valid_snapshot)
-        db.setLegendAnchor(legend_anchor_snapshot);
-    else
-        db.clearLegendAnchor();
+    db.clearLegendAnchors();
+    for (std::size_t i = 0; i < legend_anchor_snapshot.size(); ++i)
+    {
+        if (i < legend_anchor_valid_snapshot.size() && legend_anchor_valid_snapshot[i])
+            db.setLegendBlockAnchor(int(i), legend_anchor_snapshot[i]);
+    }
     db.setActiveFileRaw(active_file_snapshot);
 
     return redo;

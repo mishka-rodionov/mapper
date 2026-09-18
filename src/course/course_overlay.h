@@ -31,6 +31,7 @@
 #include <QVector>
 
 #include "core/map_coord.h"
+#include "course/course.h"
 
 class QMouseEvent;
 class QPainter;
@@ -139,6 +140,20 @@ private:
         QRectF bounds;
     };
 
+    /** One row of the IOF control description table (one regular control). */
+    struct DescriptionRow
+    {
+        int     seq;
+        int     points;
+        QString code;
+        QString part;
+        QString feature;
+        QString approach;
+        QString dims;
+        QString location;
+        QString other;
+    };
+
     void paint(QPainter* painter, const PaintContext& context);
 
     // --- Course / control paint helpers ---
@@ -157,8 +172,23 @@ private:
     int controlIndex(const QString& id) const;
     const NumberHit* numberHitAt(const QPoint& pos) const;
 
+    /** Index of the legend block whose bounds contain pos, or -1 if none. */
+    int legendBlockAt(const QPoint& pos) const;
+
     // --- IOF description table ---
     void paintDescriptionTable(QPainter* painter, const PaintContext& context);
+
+    /**
+     * Draws one legend block (header band + optional Start row + description rows +
+     * optional Finish row) at the given top-left viewport position. Returns the
+     * block's bounding rectangle so callers can lay out further blocks beside it.
+     */
+    QRectF paintLegendBlock(QPainter* painter, QPointF top_left, int cell,
+                            const QVector<DescriptionRow>& block_rows, CourseType course_type,
+                            const QString& header_name, const QString& header_info,
+                            bool show_header_text,
+                            const CourseControl* start_ctrl, const CourseControl* finish_ctrl,
+                            const PaintContext& context) const;
 
     /** Draws the content of one ISCD cell.  column is 0-based (0=A … 7=H). */
     void paintISCDCell(QPainter* painter, const QString& text,
@@ -196,15 +226,19 @@ private:
     bool show_description_table = true;
 
     // --- Legend drag state ---
-    MapCoordF legend_anchor;             ///< Top-left of legend in map coords (native units)
-    bool legend_anchor_initialized = false;
+    // Each side-by-side legend block has its own top-left anchor (map coords, native
+    // units), so blocks can be dragged independently of one another. Index 0 is the
+    // first (header) block.
+    QVector<MapCoordF> legend_block_anchors;
+    int legend_anchors_initialized = 0;  ///< How many leading entries of legend_block_anchors are valid
     bool legend_dragging = false;
+    int legend_drag_block_index = -1;    ///< Which block is being dragged
+    QPointF legend_drag_offset;          ///< Click pos relative to that block's top-left (viewport px)
     bool legend_resizing = false;
-    QPointF legend_drag_offset;          ///< Click pos relative to legend top-left (viewport px)
     QRectF legend_resize_start_bounds;
     double legend_resize_start_scale = 1.0;
     double legend_resize_current_scale = 1.0;
-    mutable QRectF legend_bounds_cache;  ///< Updated each paint; used for hit-testing
+    mutable QVector<QRectF> legend_block_bounds_cache;  ///< Updated each paint; per-block hit-test bounds
     mutable QRectF legend_resize_handle_cache;
 
     // --- Control number drag state ---

@@ -29,6 +29,7 @@ bool Course::operator==(const Course& other) const noexcept
         && entries == other.entries
         && climb_m == other.climb_m
         && description_scale == other.description_scale
+        && description_columns == other.description_columns
         && default_points == other.default_points;
 }
 

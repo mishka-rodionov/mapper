@@ -119,12 +119,26 @@ constexpr qreal number_offset_mm    = 3.5;
 // IOF Control Description cell size (mm on paper), per ISCD 2004 standard.
 constexpr qreal cell_mm = 7.0;
 
+// Grid line thickness for the legend table, as a fraction of the current cell size —
+// per the IOF description sheet standard: thin for ordinary cell borders, bold for the
+// outer frame and the separators that group columns/rows (after the 3rd/6th column,
+// every 3rd description row, and around the header/Start/Finish bands). Expressed as a
+// fraction of the cell (rather than a fixed device size) so the thin/bold distinction
+// stays visible whether the legend is rendered for the screen or for print, no matter
+// how many device pixels a "cell" happens to be at the current zoom/print resolution.
+constexpr qreal legend_grid_thin_frac = 0.03;
+constexpr qreal legend_grid_bold_frac = 0.09;
+
+// Gap between side-by-side legend blocks when a course splits its description
+// table across multiple blocks (Course::description_columns > 1).
+constexpr qreal legend_block_gap_mm = 2.5;
+
 qreal boundedDescriptionScale(double scale)
 {
     if (!(scale > 0.0))
         return 1.0;
-    if (scale < 0.25)
-        return 0.25;
+    if (scale < 0.05)
+        return 0.05;
     if (scale > 2.0)
         return 2.0;
     return static_cast<qreal>(scale);
@@ -262,11 +276,12 @@ void CourseOverlay::setPlanningActive(bool active)
     if (!planning_active)
     {
         legend_dragging = false;
+        legend_drag_block_index = -1;
         legend_resizing = false;
         number_dragging = false;
         number_drag_control_id.clear();
         number_hit_cache.clear();
-        legend_bounds_cache = {};
+        legend_block_bounds_cache.clear();
         legend_resize_handle_cache = {};
     }
 
@@ -558,6 +573,16 @@ const CourseOverlay::NumberHit* CourseOverlay::numberHitAt(const QPoint& pos) co
     return nullptr;
 }
 
+int CourseOverlay::legendBlockAt(const QPoint& pos) const
+{
+    for (int i = legend_block_bounds_cache.size() - 1; i >= 0; --i)
+    {
+        if (legend_block_bounds_cache[i].contains(pos))
+            return i;
+    }
+    return -1;
+}
+
 
 // --- Coordinate conversion ---
 
@@ -614,24 +639,28 @@ bool CourseOverlay::mousePressEvent(QMouseEvent* event)
     if (event->button() != Qt::LeftButton)
         return false;
 
-    if (show_description_table && visible_course && !legend_bounds_cache.isNull()
+    if (show_description_table && visible_course && !legend_resize_handle_cache.isNull()
         && legend_resize_handle_cache.contains(event->pos()))
     {
         legend_resizing = true;
-        legend_resize_start_bounds = legend_bounds_cache;
+        legend_resize_start_bounds = legend_block_bounds_cache.isEmpty() ? QRectF() : legend_block_bounds_cache.last();
         legend_resize_start_scale = boundedDescriptionScale(visible_course->description_scale);
         legend_resize_current_scale = legend_resize_start_scale;
         widget->setCursor(Qt::SizeFDiagCursor);
         return true;
     }
 
-    if (show_description_table && visible_course && !legend_bounds_cache.isNull()
-        && legend_bounds_cache.contains(event->pos()))
+    if (show_description_table && visible_course)
     {
-        legend_dragging = true;
-        legend_drag_offset = QPointF(event->pos()) - legend_bounds_cache.topLeft();
-        widget->setCursor(Qt::ClosedHandCursor);
-        return true;
+        const int block_index = legendBlockAt(event->pos());
+        if (block_index >= 0)
+        {
+            legend_dragging = true;
+            legend_drag_block_index = block_index;
+            legend_drag_offset = QPointF(event->pos()) - legend_block_bounds_cache[block_index].topLeft();
+            widget->setCursor(Qt::ClosedHandCursor);
+            return true;
+        }
     }
 
     if (const auto* hit = numberHitAt(event->pos()))
@@ -691,10 +720,11 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
         return true;
     }
 
-    if (show_description_table && visible_course && legend_dragging)
+    if (show_description_table && visible_course && legend_dragging
+        && legend_drag_block_index >= 0 && legend_drag_block_index < legend_block_anchors.size())
     {
         const QPointF new_tl = QPointF(event->pos()) - legend_drag_offset;
-        legend_anchor = widget->viewportToMapF(new_tl);
+        legend_block_anchors[legend_drag_block_index] = widget->viewportToMapF(new_tl);
         widget->updateEverything();
         return true;
     }
@@ -706,9 +736,8 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
         return false;
     }
 
-    // Hover: change cursor when over legend
-    if (show_description_table && visible_course && !legend_bounds_cache.isNull()
-        && legend_bounds_cache.contains(event->pos()))
+    // Hover: change cursor when over any legend block
+    if (show_description_table && visible_course && legendBlockAt(event->pos()) >= 0)
     {
         widget->setCursor(Qt::SizeAllCursor);
         return false;  // don't consume — tool still gets the event
@@ -759,7 +788,9 @@ bool CourseOverlay::mouseReleaseEvent(QMouseEvent* event)
     if (legend_dragging && event->button() == Qt::LeftButton)
     {
         legend_dragging = false;
-        db.setLegendAnchor(legend_anchor);
+        if (legend_drag_block_index >= 0 && legend_drag_block_index < legend_block_anchors.size())
+            db.setLegendBlockAnchor(legend_drag_block_index, legend_block_anchors[legend_drag_block_index]);
+        legend_drag_block_index = -1;
         widget->setCursor(Qt::ArrowCursor);
         return true;
     }
@@ -812,7 +843,7 @@ void CourseOverlay::paintStartCell(QPainter* painter, const QRectF& cell) const
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setPen(QPen(course_purple, lw));
+    painter->setPen(QPen(Qt::black, lw));
     painter->setBrush(Qt::NoBrush);
 
     QPolygonF tri;
@@ -836,7 +867,7 @@ void CourseOverlay::paintFinishCell(QPainter* painter, const QRectF& cell) const
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-    painter->setPen(QPen(course_purple, lw));
+    painter->setPen(QPen(Qt::black, lw));
     painter->setBrush(Qt::NoBrush);
     painter->drawEllipse(QPointF(cx, cy), r_outer, r_outer);
     painter->drawEllipse(QPointF(cx, cy), r_inner, r_inner);
@@ -849,24 +880,12 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
     Q_ASSERT(visible_course);
     if (context.interactive)
     {
-        legend_bounds_cache = QRectF();
+        legend_block_bounds_cache.clear();
         legend_resize_handle_cache = QRectF();
     }
 
-    struct Row {
-        int     seq;
-        int     points;
-        QString code;
-        QString part;
-        QString feature;
-        QString approach;
-        QString dims;
-        QString location;
-        QString other;
-    };
-
     // Collect regular-control rows and detect Start/Finish presence
-    QVector<Row> rows;
+    QVector<DescriptionRow> rows;
     const CourseControl* start_ctrl  = nullptr;
     const CourseControl* finish_ctrl = nullptr;
     int seq = 1;
@@ -885,7 +904,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
         }
         else if (ctrl->type == ControlType::Regular)
         {
-            Row r;
+            DescriptionRow r;
             r.seq      = seq++;
             r.points   = entry.points;
             r.code     = ctrl->description.code.isEmpty() ? ctrl->id : ctrl->description.code;
@@ -914,116 +933,222 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
     const int cell = static_cast<int>(std::round(cell_px));
 
     constexpr int NCOLS = 8;
-    const int total_w  = NCOLS * cell;
     const int header_h = 2 * cell;  // two-line header: name + info row
-    const int row_h    = cell;
-    const int total_h  = header_h
-                       + (has_start  ? row_h : 0)
-                       + row_h * rows.size()
-                       + (has_finish ? row_h : 0);
+    const int block_w  = NCOLS * cell;
+    const int gap      = static_cast<int>(std::round(mmToViewportPx(legend_block_gap_mm, context)));
 
-    // Initialize anchor: restore saved position from db, or default to bottom-left
-    if (!legend_anchor_initialized)
+    // Split the description rows across description_columns side-by-side blocks,
+    // as evenly as possible (earlier blocks absorb the remainder).
+    const int total_rows = rows.size();
+    int n_blocks = qBound(1, visible_course->description_columns, 6);
+    n_blocks = (total_rows > 0) ? std::min(n_blocks, total_rows) : 1;
+
+    QVector<int> block_sizes(n_blocks, 0);
     {
-        if (db.hasLegendAnchor())
+        const int base = total_rows / n_blocks;
+        const int rem  = total_rows % n_blocks;
+        for (int i = 0; i < n_blocks; ++i)
+            block_sizes[i] = base + (i < rem ? 1 : 0);
+    }
+
+    QVector<QVector<DescriptionRow>> blocks(n_blocks);
+    {
+        int offset = 0;
+        for (int i = 0; i < n_blocks; ++i)
         {
-            legend_anchor = db.legendAnchor();
+            blocks[i] = rows.mid(offset, block_sizes[i]);
+            offset += block_sizes[i];
         }
-        else
+    }
+
+    // Overall footprint (tallest block, all blocks + gaps side by side) — used for the
+    // default bottom-left placement and computed again below from what actually got drawn.
+    // Only the first block carries the name/stats header band; later blocks start
+    // straight at their Start/data rows, with no reserved blank space above them.
+    int total_h = 0;
+    for (int i = 0; i < n_blocks; ++i)
+    {
+        const bool blk_has_start  = (i == 0 && has_start);
+        const bool blk_has_finish = (i == n_blocks - 1 && has_finish);
+        const int blk_header_h = (i == 0) ? header_h : 0;
+        const int block_h = blk_header_h + (blk_has_start ? cell : 0)
+                          + block_sizes[i] * cell + (blk_has_finish ? cell : 0);
+        total_h = std::max(total_h, block_h);
+    }
+    const int total_w = n_blocks * block_w + (n_blocks - 1) * gap;
+
+    // Initialize each block's anchor the first time it appears: restore a saved
+    // position from the db, or default to the bottom-left of the view (block 0) /
+    // flowing right of the previous block (later blocks). Once initialized, a
+    // block's anchor is remembered independently — later blocks keep their own
+    // dragged position even if description_columns is temporarily reduced.
+    if (legend_block_anchors.size() < n_blocks)
+        legend_block_anchors.resize(n_blocks);
+
+    for (int i = legend_anchors_initialized; i < n_blocks; ++i)
+    {
+        if (db.hasLegendBlockAnchor(i))
+        {
+            legend_block_anchors[i] = db.legendBlockAnchor(i);
+        }
+        else if (i == 0)
         {
             const int margin = static_cast<int>(mmToViewportPx(5.0, context));
             const auto size = viewportSize(context);
             const QPointF default_tl(margin, size.height() - total_h - margin);
-            legend_anchor = viewportToMap(default_tl, context);
+            legend_block_anchors[0] = viewportToMap(default_tl, context);
         }
-        legend_anchor_initialized = true;
+        else
+        {
+            const QPointF prev_tl = toViewport(legend_block_anchors[i - 1], context);
+            const QPointF this_tl = prev_tl + QPointF(block_w + gap, 0);
+            legend_block_anchors[i] = viewportToMap(this_tl, context);
+        }
     }
+    legend_anchors_initialized = std::max(legend_anchors_initialized, n_blocks);
 
-    const QPointF tl = toViewport(legend_anchor, context);
-    const int x0 = static_cast<int>(std::round(tl.x()));
-    const int y0 = static_cast<int>(std::round(tl.y()));
-
-    const QRectF legend_bounds(x0, y0, total_w, total_h);
-    const QRectF legend_resize_handle = legendResizeHandleRect(legend_bounds);
-    if (context.interactive)
+    // Header text (course name + stats) is only drawn on the first block; later
+    // blocks have no header band at all — they start directly with their rows.
+    const QString header_name = visible_course->name;
+    QString header_info;
     {
-        legend_bounds_cache = legend_bounds;
-        legend_resize_handle_cache = legend_resize_handle;
-    }
+        const qreal dist_m = computeCourseDistanceM(*visible_course);
 
-    // Background
-    painter->setPen(QPen(course_purple, 1));
-    painter->setBrush(context.interactive ? QColor(255, 255, 255, 230) : QColor(Qt::white));
-    painter->drawRect(x0, y0, total_w, total_h);
-
-    // ── Double-height header ──────────────────────────────────────────
-    painter->fillRect(x0, y0, total_w, header_h,
-                      context.interactive ? QColor(148, 0, 211, 35) : QColor(246, 238, 250));
-
-    const int pad = std::max(2, cell / 8);
-    const int name_h = cell;          // top cell: course name
-    const int info_h = header_h - name_h;  // bottom cell: stats
-
-    // Course name (bold, top line)
-    {
-        QFont hf;
-        hf.setPixelSize(std::max(8, static_cast<int>(cell_px * 0.45)));
-        hf.setBold(true);
-        painter->setFont(hf);
-        painter->setPen(course_purple);
-        painter->drawText(QRect(x0 + pad, y0, total_w - 2 * pad, name_h),
-                          Qt::AlignLeft | Qt::AlignVCenter,
-                          visible_course->name);
-    }
-
-    // Info line: "N controls - D km - Climb H m"
-    {
-        QFont inf;
-        inf.setPixelSize(std::max(7, static_cast<int>(cell_px * 0.38)));
-        painter->setFont(inf);
-        painter->setPen(course_purple);
-
-        const int n_regular = rows.size();
-        const qreal dist_m  = computeCourseDistanceM(*visible_course);
-
-        QString info_text;
-        if (n_regular > 0)
-            info_text += tr("%n control(s)", "", n_regular);
+        if (total_rows > 0)
+            header_info += tr("%n control(s)", "", total_rows);
 
         if (dist_m > 0.5)
         {
-            if (!info_text.isEmpty()) info_text += QLatin1String("  -  ");
+            if (!header_info.isEmpty()) header_info += QLatin1String("  -  ");
             if (dist_m >= 1000.0)
-                info_text += tr("%1 km").arg(QString::number(dist_m / 1000.0, 'f', 1));
+                header_info += tr("%1 km").arg(QString::number(dist_m / 1000.0, 'f', 1));
             else
-                info_text += tr("%1 m").arg(QString::number(qRound(dist_m)));
+                header_info += tr("%1 m").arg(QString::number(qRound(dist_m)));
         }
 
         if (visible_course->climb_m > 0)
         {
-            if (!info_text.isEmpty()) info_text += QLatin1String("  -  ");
-            info_text += tr("Climb %1 m").arg(visible_course->climb_m);
+            if (!header_info.isEmpty()) header_info += QLatin1String("  -  ");
+            header_info += tr("Climb %1 m").arg(visible_course->climb_m);
         }
-
-        painter->drawText(QRect(x0 + pad, y0 + name_h, total_w - 2 * pad, info_h),
-                          Qt::AlignLeft | Qt::AlignVCenter,
-                          info_text);
     }
 
-    // Separator between header and data rows
-    painter->setPen(QPen(course_purple, 1.5));
-    painter->drawLine(x0, y0 + header_h, x0 + total_w, y0 + header_h);
+    // Each block is painted at its own, independently draggable anchor — blocks are
+    // no longer forced into a single left-to-right flow.
+    QVector<QRectF> block_rects(n_blocks);
+    for (int i = 0; i < n_blocks; ++i)
+    {
+        const bool blk_has_start  = (i == 0 && has_start);
+        const bool blk_has_finish = (i == n_blocks - 1 && has_finish);
 
-    // Column grid lines (only over data rows, not header)
+        const QPointF block_tl = toViewport(legend_block_anchors[i], context);
+        block_rects[i] = paintLegendBlock(painter, block_tl, cell, blocks[i],
+                                           visible_course->type,
+                                           header_name, header_info,
+                                           /* show_header_text = */ i == 0,
+                                           blk_has_start  ? start_ctrl  : nullptr,
+                                           blk_has_finish ? finish_ctrl : nullptr,
+                                           context);
+    }
+
+    if (context.interactive)
+    {
+        legend_block_bounds_cache = block_rects;
+        // The resize handle always sits at the last block's corner (it drives the
+        // shared cell size for every block).
+        legend_resize_handle_cache = legendResizeHandleRect(block_rects.last());
+
+        painter->setPen(QPen(QColor(90, 90, 90), 1));
+        const QRectF grip = legend_resize_handle_cache.adjusted(2, 2, -2, -2);
+        painter->drawLine(grip.bottomLeft(), grip.topRight());
+        painter->drawLine(QPointF(grip.left() + grip.width() * 0.45, grip.bottom()),
+                          QPointF(grip.right(), grip.top() + grip.height() * 0.45));
+    }
+
+    painter->restore();
+}
+
+
+QRectF CourseOverlay::paintLegendBlock(QPainter* painter, QPointF top_left, int cell,
+                                        const QVector<DescriptionRow>& block_rows, CourseType course_type,
+                                        const QString& header_name, const QString& header_info,
+                                        bool show_header_text,
+                                        const CourseControl* start_ctrl, const CourseControl* finish_ctrl,
+                                        const PaintContext& context) const
+{
+    constexpr int NCOLS = 8;
+    const int total_w  = NCOLS * cell;
+    const int header_h = show_header_text ? 2 * cell : 0;  // only the first block has a header
+    const int row_h    = cell;
+    const int total_h  = header_h
+                       + (start_ctrl  ? row_h : 0)
+                       + row_h * block_rows.size()
+                       + (finish_ctrl ? row_h : 0);
+
+    const int x0 = static_cast<int>(std::round(top_left.x()));
+    const int y0 = static_cast<int>(std::round(top_left.y()));
+
+    // Line thickness as a fraction of the cell, so bold vs. thin stays visually
+    // distinct regardless of the device resolution (screen zoom or print DPI).
+    const qreal thin_w = std::max(1.0, cell * legend_grid_thin_frac);
+    const qreal bold_w = std::max(1.5, cell * legend_grid_bold_frac);
+
+    // Background + outer frame. Per the IOF description sheet standard, the whole
+    // table is outlined by a bold line.
+    painter->setPen(QPen(Qt::black, bold_w));
+    painter->setBrush(context.interactive ? QColor(255, 255, 255, 230) : QColor(Qt::white));
+    painter->drawRect(x0, y0, total_w, total_h);
+
+    // ── Double-height header (name + stats), plain — no colour tint ────
+    const int pad = std::max(2, cell / 8);
+    const int name_h = cell;          // top cell: course name
+    const int info_h = header_h - name_h;  // bottom cell: stats
+
+    if (show_header_text)
+    {
+        // Course name (bold, top line)
+        QFont hf;
+        hf.setPixelSize(std::max(8, static_cast<int>(cell * 0.45)));
+        hf.setBold(true);
+        painter->setFont(hf);
+        painter->setPen(Qt::black);
+        painter->drawText(QRect(x0 + pad, y0, total_w - 2 * pad, name_h),
+                          Qt::AlignLeft | Qt::AlignVCenter,
+                          header_name);
+
+        // Info line: "N controls - D km - Climb H m"
+        QFont inf;
+        inf.setPixelSize(std::max(7, static_cast<int>(cell * 0.38)));
+        painter->setFont(inf);
+        painter->setPen(Qt::black);
+        painter->drawText(QRect(x0 + pad, y0 + name_h, total_w - 2 * pad, info_h),
+                          Qt::AlignLeft | Qt::AlignVCenter,
+                          header_info);
+    }
+
+    // Separator between header and body — bold, per the IOF standard. Only
+    // relevant when this block actually has a header.
+    if (header_h > 0)
+    {
+        painter->setPen(QPen(Qt::black, bold_w));
+        painter->drawLine(x0, y0 + header_h, x0 + total_w, y0 + header_h);
+    }
+
+    // Column grid lines (only over the body, not the header). Bold after the 3rd
+    // and 6th column — these separate the more significant control information
+    // (object, marker placement), per the IOF description sheet standard.
     for (int c = 1; c < NCOLS; ++c)
+    {
+        painter->setPen(QPen(Qt::black, (c % 3 == 0) ? bold_w : thin_w));
         painter->drawLine(x0 + c * cell, y0 + header_h, x0 + c * cell, y0 + total_h);
+    }
 
     int current_y = y0 + header_h;
 
-    // ── Start row ────────────────────────────────────────────────────
-    if (has_start)
+    // ── Start row (a "special instruction" row — bold border) ──────────
+    if (start_ctrl)
     {
-        painter->setPen(QPen(QColor(200, 200, 200), 1.5));
+        painter->setPen(QPen(Qt::black, bold_w));
         painter->drawLine(x0, current_y, x0 + total_w, current_y);
 
         const QRectF start_cell(x0, current_y, cell, row_h);
@@ -1033,22 +1158,24 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
 
     // ── Regular control rows ─────────────────────────────────────────
     QFont df;
-    df.setPixelSize(std::max(7, static_cast<int>(cell_px * 0.40)));
+    df.setPixelSize(std::max(7, static_cast<int>(cell * 0.40)));
 
     QFont df_id;
-    df_id.setPixelSize(std::max(8, static_cast<int>(cell_px * 0.48)));
+    df_id.setPixelSize(std::max(8, static_cast<int>(cell * 0.48)));
     df_id.setBold(true);
 
-    for (int i = 0; i < rows.size(); ++i)
+    for (int i = 0; i < block_rows.size(); ++i)
     {
-        const auto& r = rows[i];
+        const auto& r = block_rows[i];
         const int ry = current_y;
 
-        painter->setPen(QPen(QColor(180, 180, 180), 1.5));
+        // Bold separator after every 3rd description row, per the IOF standard.
+        const bool bold_sep = (i > 0 && i % 3 == 0);
+        painter->setPen(QPen(Qt::black, bold_sep ? bold_w : thin_w));
         painter->drawLine(x0, ry, x0 + total_w, ry);
 
         const QString cells[NCOLS] = {
-            QString::number(visible_course->type == CourseType::Score ? r.points : r.seq),
+            QString::number(course_type == CourseType::Score ? r.points : r.seq),
             r.code, r.part, r.feature, r.approach, r.dims, r.location, r.other
         };
         for (int c = 0; c < NCOLS; ++c)
@@ -1061,10 +1188,10 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
     }
     painter->setFont(df);
 
-    // ── Finish row ───────────────────────────────────────────────────
-    if (has_finish)
+    // ── Finish row (a "special instruction" row — bold border) ─────────
+    if (finish_ctrl)
     {
-        painter->setPen(QPen(QColor(200, 200, 200), 1.5));
+        painter->setPen(QPen(Qt::black, bold_w));
         painter->drawLine(x0, current_y, x0 + total_w, current_y);
 
         const QRectF finish_cell(x0, current_y, cell, row_h);
@@ -1072,21 +1199,12 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
         current_y += row_h;
     }
 
-    // Outer border
-    painter->setPen(QPen(course_purple, 1));
+    // Redraw the outer frame on top, crisp over the header/row fills.
+    painter->setPen(QPen(Qt::black, bold_w));
     painter->setBrush(Qt::NoBrush);
     painter->drawRect(x0, y0, total_w, total_h);
 
-    painter->setPen(QPen(course_purple, 1));
-    if (context.interactive)
-    {
-        const QRectF grip = legend_resize_handle.adjusted(2, 2, -2, -2);
-        painter->drawLine(grip.bottomLeft(), grip.topRight());
-        painter->drawLine(QPointF(grip.left() + grip.width() * 0.45, grip.bottom()),
-                          QPointF(grip.right(), grip.top() + grip.height() * 0.45));
-    }
-
-    painter->restore();
+    return QRectF(x0, y0, total_w, total_h);
 }
 
 

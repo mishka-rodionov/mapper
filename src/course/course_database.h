@@ -105,12 +105,18 @@ public:
     void removeCourse(int index);
 
 
-    // --- Legend anchor ---
+    // --- Legend block anchors ---
+    //
+    // Each side-by-side legend block (Course::description_columns) has its own,
+    // independently draggable top-left position. Index 0 is the first block.
 
-    bool hasLegendAnchor() const { return legend_anchor_valid; }
-    MapCoordF legendAnchor() const { return legend_anchor; }
-    void setLegendAnchor(const MapCoordF& anchor);
-    void clearLegendAnchor();
+    /** Number of block indices with a stored anchor (some slots may still be unset). */
+    int legendBlockAnchorCount() const { return static_cast<int>(legend_block_anchors.size()); }
+    bool hasLegendBlockAnchor(int index) const;
+    MapCoordF legendBlockAnchor(int index) const;
+    void setLegendBlockAnchor(int index, const MapCoordF& anchor);
+    /** Clears all stored legend block anchors. */
+    void clearLegendAnchors();
 
 
     // --- Course file association ---
@@ -165,8 +171,8 @@ private:
     QString event_name;
     std::vector<CourseControl> controls;
     std::vector<Course> courses;
-    MapCoordF legend_anchor;
-    bool legend_anchor_valid = false;
+    std::vector<MapCoordF> legend_block_anchors;
+    std::vector<bool> legend_block_anchor_valid;
     QString active_file;
     QStringList recent_files;
 };
