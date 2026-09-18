@@ -19,6 +19,7 @@
 
 #include "course_overlay.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QtMath>
@@ -109,12 +110,18 @@ namespace {
 const QColor course_purple { 148, 0, 211 };
 
 // Standard IOF control sizes in millimeters at map scale.
-constexpr qreal circle_diameter_mm  = 5.0;
+constexpr qreal circle_diameter_mm  = 6.25;  // 5.0mm standard, +25%
 constexpr qreal finish_outer_mm     = 7.0;
 constexpr qreal finish_inner_mm     = 5.0;
 constexpr qreal triangle_size_mm    = 6.0;
 constexpr qreal line_width_mm       = 0.35;
 constexpr qreal number_offset_mm    = 3.5;
+
+// Manual leg-break editing: gap length cut into the connector line at a break
+// point, and the on-screen hit-test radius (px) for grabbing a break marker.
+constexpr qreal leg_gap_mm       = 1.0;
+constexpr qreal leg_break_hit_px = 5.0;
+constexpr qreal leg_line_hit_px  = 6.0;
 
 // IOF Control Description cell size (mm on paper), per ISCD 2004 standard.
 constexpr qreal cell_mm = 7.0;
@@ -283,6 +290,12 @@ void CourseOverlay::setPlanningActive(bool active)
         number_hit_cache.clear();
         legend_block_bounds_cache.clear();
         legend_resize_handle_cache = {};
+        break_dragging = false;
+        break_drag_entry_index = -1;
+        break_drag_break_index = -1;
+        break_drag_before.clear();
+        leg_hit_cache.clear();
+        break_hit_cache.clear();
     }
 
     widget->updateEverything();
@@ -319,6 +332,8 @@ void CourseOverlay::paint(QPainter* painter, const PaintContext& context)
     if (context.interactive)
     {
         number_hit_cache.clear();
+        leg_hit_cache.clear();
+        break_hit_cache.clear();
         if (!planning_active)
             return;
     }
@@ -350,17 +365,26 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course, const P
         return;
 
     QVector<const CourseControl*> resolved;
+    QVector<int> resolved_entry_idx;
     resolved.reserve(static_cast<int>(course.entries.size()));
-    for (const auto& entry : course.entries)
+    resolved_entry_idx.reserve(static_cast<int>(course.entries.size()));
+    for (int ei = 0; ei < static_cast<int>(course.entries.size()); ++ei)
     {
-        if (const auto* ctrl = db.findById(entry.control_id))
+        if (const auto* ctrl = db.findById(course.entries[std::size_t(ei)].control_id))
+        {
             resolved.append(ctrl);
+            resolved_entry_idx.append(ei);
+        }
     }
 
     if (course.type == CourseType::Linear)
     {
         for (int i = 1; i < resolved.size(); ++i)
-            paintLeg(painter, toViewport(*resolved[i-1], context), toViewport(*resolved[i], context), context);
+        {
+            const int entry_index = resolved_entry_idx[i];
+            paintLeg(painter, toViewport(*resolved[i-1], context), toViewport(*resolved[i], context),
+                     entry_index, course.entries[std::size_t(entry_index)].leg_breaks, context);
+        }
     }
 
     int seq = 1;
@@ -433,7 +457,8 @@ void CourseOverlay::paintAllControls(QPainter* painter, const PaintContext& cont
 
 // --- Individual symbol painters ---
 
-void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to, const PaintContext& context) const
+void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to, int entry_index,
+                             const std::vector<double>& breaks, const PaintContext& context) const
 {
     const qreal lw = mmToViewportPx(line_width_mm, context);
     painter->setPen(QPen(course_purple, lw));
@@ -446,10 +471,71 @@ void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to, const 
         return;
 
     const qreal f = r / len;
-    QPointF start = from + f * d;
-    QPointF end   = to   - f * d;
+    const QPointF start = from + f * d;
+    const QPointF end   = to   - f * d;
 
-    painter->drawLine(start, end);
+    if (context.interactive)
+        leg_hit_cache.append(LegHit { entry_index, start, end });
+
+    if (breaks.empty())
+    {
+        painter->drawLine(start, end);
+        return;
+    }
+
+    const QPointF seg = end - start;
+    const qreal seg_len = std::sqrt(QPointF::dotProduct(seg, seg));
+    if (seg_len < 1e-6)
+    {
+        painter->drawLine(start, end);
+        return;
+    }
+    const QPointF unit = seg / seg_len;
+    const qreal gap_half = mmToViewportPx(leg_gap_mm, context) / 2.0;
+
+    // Sort breaks by position along the line, but remember each one's original
+    // index into `breaks` so hit-testing can address it for drag/remove.
+    struct SortedBreak { double t; int original_index; };
+    std::vector<SortedBreak> sorted;
+    sorted.reserve(breaks.size());
+    for (int i = 0; i < static_cast<int>(breaks.size()); ++i)
+        sorted.push_back({ qBound(0.0, breaks[std::size_t(i)], 1.0), i });
+    std::sort(sorted.begin(), sorted.end(), [](const SortedBreak& a, const SortedBreak& b) { return a.t < b.t; });
+
+    QPointF cursor = start;
+    for (const auto& b : sorted)
+    {
+        const QPointF center = start + b.t * seg;
+        QPointF gap_start = center - unit * gap_half;
+        QPointF gap_end   = center + unit * gap_half;
+
+        // Clamp so gaps never eat into the already-drawn portion of the line
+        // or spill past its end (adjacent/near-adjacent breaks).
+        if (QPointF::dotProduct(gap_start - cursor, unit) < 0.0)
+            gap_start = cursor;
+        if (QPointF::dotProduct(end - gap_end, unit) < 0.0)
+            gap_end = end;
+
+        if (QPointF::dotProduct(gap_start - cursor, unit) > 0.0)
+            painter->drawLine(cursor, gap_start);
+        cursor = gap_end;
+
+        if (context.interactive)
+        {
+            const QRectF bounds(center.x() - leg_break_hit_px, center.y() - leg_break_hit_px,
+                                2.0 * leg_break_hit_px, 2.0 * leg_break_hit_px);
+            break_hit_cache.append(BreakHit { entry_index, b.original_index, bounds });
+
+            painter->save();
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(course_purple);
+            painter->drawEllipse(center, 2.0, 2.0);
+            painter->restore();
+        }
+    }
+
+    if (QPointF::dotProduct(end - cursor, unit) > 0.0)
+        painter->drawLine(cursor, end);
 }
 
 void CourseOverlay::paintStart(QPainter* painter, QPointF pos, double rotation_rad, const PaintContext& context) const
@@ -517,7 +603,7 @@ void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const 
         return;
 
     QFont font;
-    font.setPixelSize(static_cast<int>(mmToViewportPx(3.45, context)));
+    font.setPixelSize(static_cast<int>(mmToViewportPx(4.3125, context)));  // 3.45mm standard, +25%
     font.setBold(true);
     painter->setFont(font);
 
@@ -584,6 +670,99 @@ int CourseOverlay::legendBlockAt(const QPoint& pos) const
 }
 
 
+// --- Leg break editing ---
+
+const CourseOverlay::LegHit* CourseOverlay::legHitAt(const QPoint& pos) const
+{
+    for (const auto& hit : leg_hit_cache)
+    {
+        const QPointF seg = hit.end - hit.start;
+        const qreal len2 = QPointF::dotProduct(seg, seg);
+        if (len2 < 1e-6)
+            continue;
+
+        const qreal t = qBound(0.0, QPointF::dotProduct(QPointF(pos) - hit.start, seg) / len2, 1.0);
+        const QPointF proj = hit.start + t * seg;
+        const QPointF diff = QPointF(pos) - proj;
+        if (QPointF::dotProduct(diff, diff) <= leg_line_hit_px * leg_line_hit_px)
+            return &hit;
+    }
+    return nullptr;
+}
+
+const CourseOverlay::BreakHit* CourseOverlay::breakHitAt(const QPoint& pos) const
+{
+    for (const auto& hit : break_hit_cache)
+    {
+        if (hit.bounds.contains(pos))
+            return &hit;
+    }
+    return nullptr;
+}
+
+int CourseOverlay::visibleCourseIndex() const
+{
+    if (!visible_course)
+        return -1;
+
+    for (int i = 0; i < db.numCourses(); ++i)
+    {
+        if (&db.course(i) == visible_course)
+            return i;
+    }
+    return -1;
+}
+
+std::vector<Course> CourseOverlay::coursesSnapshot() const
+{
+    std::vector<Course> snapshot;
+    snapshot.reserve(std::size_t(db.numCourses()));
+    for (int i = 0; i < db.numCourses(); ++i)
+        snapshot.push_back(db.course(i));
+    return snapshot;
+}
+
+void CourseOverlay::addLegBreak(int entry_index, double t)
+{
+    const int course_index = visibleCourseIndex();
+    if (course_index < 0)
+        return;
+
+    Course updated = db.course(course_index);
+    if (entry_index < 0 || entry_index >= static_cast<int>(updated.entries.size()))
+        return;
+
+    auto snapshot = coursesSnapshot();
+    updated.entries[std::size_t(entry_index)].leg_breaks.push_back(qBound(0.0, t, 1.0));
+    db.updateCourse(course_index, std::move(updated));
+
+    auto* map = widget->getMapView()->getMap();
+    map->push(new CoursesChangedUndoStep(map, std::move(snapshot)));
+}
+
+void CourseOverlay::removeLegBreak(int entry_index, int break_index)
+{
+    const int course_index = visibleCourseIndex();
+    if (course_index < 0)
+        return;
+
+    Course updated = db.course(course_index);
+    if (entry_index < 0 || entry_index >= static_cast<int>(updated.entries.size()))
+        return;
+
+    auto& breaks = updated.entries[std::size_t(entry_index)].leg_breaks;
+    if (break_index < 0 || break_index >= static_cast<int>(breaks.size()))
+        return;
+
+    auto snapshot = coursesSnapshot();
+    breaks.erase(breaks.begin() + break_index);
+    db.updateCourse(course_index, std::move(updated));
+
+    auto* map = widget->getMapView()->getMap();
+    map->push(new CoursesChangedUndoStep(map, std::move(snapshot)));
+}
+
+
 // --- Coordinate conversion ---
 
 QPointF CourseOverlay::toViewport(const CourseControl& ctrl, const PaintContext& context) const
@@ -636,8 +815,40 @@ bool CourseOverlay::mousePressEvent(QMouseEvent* event)
     if (!planning_active)
         return false;
 
+    // Right-click on a leg toggles a manual break: on an existing break marker it
+    // removes it, on the line itself it adds a new one at the clicked point.
+    if (event->button() == Qt::RightButton && visible_course)
+    {
+        if (const auto* hit = breakHitAt(event->pos()))
+        {
+            removeLegBreak(hit->entry_index, hit->break_index);
+            return true;
+        }
+        if (const auto* hit = legHitAt(event->pos()))
+        {
+            const QPointF seg = hit->end - hit->start;
+            const qreal len2 = QPointF::dotProduct(seg, seg);
+            const double t = (len2 > 1e-6)
+                ? qBound(0.0, QPointF::dotProduct(QPointF(event->pos()) - hit->start, seg) / len2, 1.0)
+                : 0.5;
+            addLegBreak(hit->entry_index, t);
+            return true;
+        }
+        return false;
+    }
+
     if (event->button() != Qt::LeftButton)
         return false;
+
+    if (const auto* hit = breakHitAt(event->pos()))
+    {
+        break_dragging = true;
+        break_drag_entry_index = hit->entry_index;
+        break_drag_break_index = hit->break_index;
+        break_drag_before = coursesSnapshot();
+        widget->setCursor(Qt::ClosedHandCursor);
+        return true;
+    }
 
     if (show_description_table && visible_course && !legend_resize_handle_cache.isNull()
         && legend_resize_handle_cache.contains(event->pos()))
@@ -684,6 +895,37 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
 {
     if (!planning_active)
         return false;
+
+    if (break_dragging)
+    {
+        for (const auto& hit : leg_hit_cache)
+        {
+            if (hit.entry_index != break_drag_entry_index)
+                continue;
+
+            const QPointF seg = hit.end - hit.start;
+            const qreal len2 = QPointF::dotProduct(seg, seg);
+            if (len2 < 1e-6)
+                break;
+
+            const int course_index = visibleCourseIndex();
+            if (course_index < 0)
+                break;
+
+            Course updated = db.course(course_index);
+            auto& breaks = updated.entries[std::size_t(break_drag_entry_index)].leg_breaks;
+            if (break_drag_break_index < 0 || break_drag_break_index >= static_cast<int>(breaks.size()))
+                break;
+
+            const double t = qBound(0.0, QPointF::dotProduct(QPointF(event->pos()) - hit.start, seg) / len2, 1.0);
+            breaks[std::size_t(break_drag_break_index)] = t;
+            db.updateCourse(course_index, std::move(updated));
+            break;
+        }
+
+        widget->setCursor(Qt::ClosedHandCursor);
+        return true;
+    }
 
     if (number_dragging)
     {
@@ -749,6 +991,18 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
         return false;
     }
 
+    if (breakHitAt(event->pos()))
+    {
+        widget->setCursor(Qt::OpenHandCursor);
+        return false;
+    }
+
+    if (legHitAt(event->pos()))
+    {
+        widget->setCursor(Qt::CrossCursor);
+        return false;
+    }
+
     return false;
 }
 
@@ -756,6 +1010,22 @@ bool CourseOverlay::mouseReleaseEvent(QMouseEvent* event)
 {
     if (!planning_active)
         return false;
+
+    if (break_dragging && event->button() == Qt::LeftButton)
+    {
+        if (coursesSnapshot() != break_drag_before)
+        {
+            auto* map = widget->getMapView()->getMap();
+            map->push(new CoursesChangedUndoStep(map, std::move(break_drag_before)));
+        }
+
+        break_dragging = false;
+        break_drag_entry_index = -1;
+        break_drag_break_index = -1;
+        break_drag_before.clear();
+        widget->setCursor(Qt::ArrowCursor);
+        return true;
+    }
 
     if (number_dragging && event->button() == Qt::LeftButton)
     {

@@ -48,7 +48,7 @@ namespace OpenOrienteering {
 namespace {
 
 const QColor course_purple { 148, 0, 211 };
-constexpr qreal circle_diameter_mm = 5.0;
+constexpr qreal circle_diameter_mm = 6.25;  // 5.0mm standard, +25%, must match course_overlay.cpp
 constexpr qreal line_width_mm      = 0.35;
 
 }  // anonymous namespace

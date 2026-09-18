@@ -43,9 +43,18 @@ struct CourseEntry
     QString control_id;  ///< Matches CourseControl::id in the CourseDatabase
     int points = 0;      ///< Score awarded for this control (Score courses only)
 
+    /**
+     * Manually placed gaps on the incoming leg line (the segment connecting
+     * the previous control to this one), as parametric positions in [0, 1]
+     * along that line. Lets the user break the connector where it crosses
+     * an important map feature or another leg.
+     */
+    std::vector<double> leg_breaks;
+
     bool operator==(const CourseEntry& other) const noexcept
     {
-        return control_id == other.control_id && points == other.points;
+        return control_id == other.control_id && points == other.points
+               && leg_breaks == other.leg_breaks;
     }
     bool operator!=(const CourseEntry& other) const noexcept { return !(*this == other); }
 };

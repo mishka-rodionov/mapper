@@ -22,6 +22,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QLatin1String>
+#include <QStringList>
 #include <QtGlobal>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
@@ -56,6 +57,7 @@ static const QLatin1String attr_name         ("name");
 static const QLatin1String attr_control      ("control");
 static const QLatin1String attr_climb        ("climb");
 static const QLatin1String attr_points       ("points");
+static const QLatin1String attr_breaks       ("breaks");
 static const QLatin1String attr_default_points("default_points");
 static const QLatin1String attr_description_scale("description_scale");
 static const QLatin1String attr_description_columns("description_columns");
@@ -170,6 +172,14 @@ void saveCourse(QXmlStreamWriter& xml, const Course& c)
         entry_elem.writeAttribute(attr_control, entry.control_id);
         if (c.type == CourseType::Score)
             entry_elem.writeAttribute(attr_points, entry.points);
+        if (!entry.leg_breaks.empty())
+        {
+            QStringList parts;
+            parts.reserve(static_cast<int>(entry.leg_breaks.size()));
+            for (double t : entry.leg_breaks)
+                parts << QString::number(t, 'g', 6);
+            entry_elem.writeAttribute(attr_breaks, parts.join(QLatin1Char(';')));
+        }
     }
 }
 
@@ -242,6 +252,17 @@ Course loadCourse(QXmlStreamReader& xml)
             CourseEntry entry;
             entry.control_id = xml.attributes().value(attr_control).toString();
             entry.points     = xml.attributes().value(attr_points).toInt();
+            const QString breaks_str = xml.attributes().value(attr_breaks).toString();
+            if (!breaks_str.isEmpty())
+            {
+                for (const auto& part : breaks_str.split(QLatin1Char(';'), QString::SkipEmptyParts))
+                {
+                    bool ok = false;
+                    const double t = part.toDouble(&ok);
+                    if (ok)
+                        entry.leg_breaks.push_back(qBound(0.0, t, 1.0));
+                }
+            }
             c.entries.push_back(std::move(entry));
             xml.skipCurrentElement();
         }

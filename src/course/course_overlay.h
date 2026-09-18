@@ -20,6 +20,8 @@
 #ifndef OPENORIENTEERING_COURSE_OVERLAY_H
 #define OPENORIENTEERING_COURSE_OVERLAY_H
 
+#include <vector>
+
 #include <QJsonObject>
 #include <QObject>
 #include <QPoint>
@@ -140,6 +142,24 @@ private:
         QRectF bounds;
     };
 
+    /** A leg (connector line) segment, cached each paint for hit-testing right-clicks
+     *  that add a manual break. entry_index indexes into the visible course's
+     *  entries — the break is stored on the entry the leg leads INTO. */
+    struct LegHit
+    {
+        int entry_index;
+        QPointF start;  ///< Viewport position, trimmed to the control circle edge
+        QPointF end;
+    };
+
+    /** One existing manual break marker, cached each paint for hit-testing. */
+    struct BreakHit
+    {
+        int entry_index;
+        int break_index;  ///< Index into entries[entry_index].leg_breaks
+        QRectF bounds;
+    };
+
     /** One row of the IOF control description table (one regular control). */
     struct DescriptionRow
     {
@@ -160,7 +180,8 @@ private:
     void paintCourse(QPainter* painter, const Course& course, const PaintContext& context) const;
     void paintAllControls(QPainter* painter, const PaintContext& context) const;
 
-    void paintLeg(QPainter* painter, QPointF from, QPointF to, const PaintContext& context) const;
+    void paintLeg(QPainter* painter, QPointF from, QPointF to, int entry_index,
+                  const std::vector<double>& breaks, const PaintContext& context) const;
     void paintStart(QPainter* painter, QPointF pos, double rotation_rad, const PaintContext& context) const;
     void paintControl(QPainter* painter, QPointF pos, const CourseControl& ctrl, const QString& number, const PaintContext& context) const;
     void paintFinish(QPainter* painter, QPointF pos, const PaintContext& context) const;
@@ -171,6 +192,16 @@ private:
     void rememberNumberHit(QPainter* painter, const CourseControl& ctrl, const QString& number, QPointF text_pos, const PaintContext& context) const;
     int controlIndex(const QString& id) const;
     const NumberHit* numberHitAt(const QPoint& pos) const;
+
+    // --- Leg break editing ---
+    const LegHit* legHitAt(const QPoint& pos) const;
+    const BreakHit* breakHitAt(const QPoint& pos) const;
+    /** Index of visible_course within db, or -1 if none is visible. */
+    int visibleCourseIndex() const;
+    /** Snapshot of all courses in the database, for whole-course undo steps. */
+    std::vector<Course> coursesSnapshot() const;
+    void addLegBreak(int entry_index, double t);
+    void removeLegBreak(int entry_index, int break_index);
 
     /** Index of the legend block whose bounds contain pos, or -1 if none. */
     int legendBlockAt(const QPoint& pos) const;
@@ -247,6 +278,14 @@ private:
     MapCoordF number_drag_start_map;
     MapCoordF number_drag_start_offset;
     bool number_dragging = false;
+
+    // --- Leg break editing state ---
+    mutable QVector<LegHit> leg_hit_cache;
+    mutable QVector<BreakHit> break_hit_cache;
+    bool break_dragging = false;
+    int break_drag_entry_index = -1;
+    int break_drag_break_index = -1;
+    std::vector<Course> break_drag_before;
 };
 
 
