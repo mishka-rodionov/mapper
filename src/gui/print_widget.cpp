@@ -40,6 +40,8 @@
 #include <QGuiApplication>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
+#include <QFontDatabase>
+#include <QFontMetrics>
 #include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -55,6 +57,7 @@
 #include <QMessageBox>
 #include <QPageSize>
 #include <QPainter>
+#include <QPlainTextEdit>
 #include <QPointF>
 #include <QPrinter>
 #include <QPrinterInfo>
@@ -1379,29 +1382,57 @@ void PrintWidget::showCompetraBounds() const
 	if (georef.getState() != Georeferencing::Geospatial)
 		return;
 
-	// Assumes a north-up map (standard for printed orienteering maps): takes
-	// the geographic bounding box of the print area's four corners rather
-	// than a full affine transform, so a simple top-left/bottom-right pair
-	// is enough for the caller to overlay the exported raster on OSM.
+	// Exact top-left, top-right and bottom-right corners of the exported
+	// raster (not their bounding box): a map drawn to magnetic/grid north is
+	// rotated relative to true north, and squeezing it into a north-up box
+	// would shift it by tens of metres. Three corners define the affine
+	// transform the clients use to overlay the raster on OSM; the fourth is
+	// implied (bottomLeft = topLeft + bottomRight - topRight).
 	const auto area = map_printer->getPrintArea();
-	const auto p0 = georef.toGeographicCoords(MapCoordF(area.topLeft()));
-	const auto p1 = georef.toGeographicCoords(MapCoordF(area.topRight()));
-	const auto p2 = georef.toGeographicCoords(MapCoordF(area.bottomRight()));
-	const auto p3 = georef.toGeographicCoords(MapCoordF(area.bottomLeft()));
-
-	const auto top = std::max({p0.latitude(), p1.latitude(), p2.latitude(), p3.latitude()});
-	const auto bottom = std::min({p0.latitude(), p1.latitude(), p2.latitude(), p3.latitude()});
-	const auto left = std::min({p0.longitude(), p1.longitude(), p2.longitude(), p3.longitude()});
-	const auto right = std::max({p0.longitude(), p1.longitude(), p2.longitude(), p3.longitude()});
+	const auto top_left = georef.toGeographicCoords(MapCoordF(area.topLeft()));
+	const auto top_right = georef.toGeographicCoords(MapCoordF(area.topRight()));
+	const auto bottom_right = georef.toGeographicCoords(MapCoordF(area.bottomRight()));
 
 	const auto text = QStringLiteral(
-	    "mapTopLeftLat=%1\nmapTopLeftLng=%2\nmapBottomRightLat=%3\nmapBottomRightLng=%4"
-	).arg(top, 0, 'f', 7).arg(left, 0, 'f', 7).arg(bottom, 0, 'f', 7).arg(right, 0, 'f', 7);
+	    "mapTopLeftLat=%1\nmapTopLeftLng=%2\n"
+	    "mapTopRightLat=%3\nmapTopRightLng=%4\n"
+	    "mapBottomRightLat=%5\nmapBottomRightLng=%6"
+	).arg(top_left.latitude(), 0, 'f', 7).arg(top_left.longitude(), 0, 'f', 7)
+	 .arg(top_right.latitude(), 0, 'f', 7).arg(top_right.longitude(), 0, 'f', 7)
+	 .arg(bottom_right.latitude(), 0, 'f', 7).arg(bottom_right.longitude(), 0, 'f', 7);
 
+	// Copied right away (most users paste immediately), and the dialog keeps a
+	// Copy button in case the clipboard was overwritten before pasting.
 	QGuiApplication::clipboard()->setText(text);
-	QMessageBox::information(const_cast<PrintWidget*>(this), tr("Competra map bounds"),
-	    tr("These WGS84 corner coordinates have been copied to the clipboard.\n"
-	       "Paste them into the distance map upload form on the Competra website:\n\n%1").arg(text));
+
+	QDialog dialog(const_cast<PrintWidget*>(this));
+	dialog.setWindowTitle(tr("Competra map bounds"));
+	auto* layout = new QVBoxLayout(&dialog);
+
+	auto* hint = new QLabel(tr("The WGS84 corner coordinates of the exported image have been copied to the clipboard.\n"
+	                           "On the Competra website, open the distance map form and press "
+	                           "\"Paste from Mapper\" (or paste the text into the coordinates field)."));
+	hint->setWordWrap(true);
+	layout->addWidget(hint);
+
+	auto* text_view = new QPlainTextEdit(text);
+	text_view->setReadOnly(true);
+	text_view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+	text_view->setMinimumSize(text_view->fontMetrics().boundingRect(QStringLiteral("mapBottomRightLng=-000.0000000")).width() + 40,
+	                          text_view->fontMetrics().lineSpacing() * 7 + 16);
+	layout->addWidget(text_view);
+
+	auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+	auto* copy_button = buttons->addButton(tr("Copy"), QDialogButtonBox::ActionRole);
+	copy_button->setDefault(true);
+	connect(copy_button, &QPushButton::clicked, &dialog, [copy_button, text]() {
+		QGuiApplication::clipboard()->setText(text);
+		copy_button->setText(tr("Copied"));
+	});
+	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+	layout->addWidget(buttons);
+
+	dialog.exec();
 }
 
 bool PrintWidget::exportWorldFile(const QString& path) const

@@ -265,8 +265,10 @@ protected:
 	/** Export a world file */
 	bool exportWorldFile(const QString& path) const;
 
-	/** Copies the WGS84 corner coordinates of the print area to the clipboard,
-	 *  for pasting into the Competra distance map upload form. */
+	/** Copies the exact WGS84 top-left, top-right and bottom-right corners of
+	 *  the print area to the clipboard, for pasting into the Competra distance
+	 *  map upload form. Three corners (not a bounding box) keep rotated maps
+	 *  aligned with OSM. */
 	void showCompetraBounds() const;
 	
 	/** Exports to a PDF file. */
