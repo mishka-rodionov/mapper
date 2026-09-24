@@ -118,9 +118,12 @@ constexpr qreal line_width_mm       = 0.35;
 constexpr qreal number_offset_mm    = 3.5;
 
 // Manual leg-break editing: gap length cut into the connector line at a break
-// point, and the on-screen hit-test radius (px) for grabbing a break marker.
+// point, and the minimum on-screen hit-test radius (px) for grabbing a break.
+// The break hit zone also grows to cover the whole visible gap, and is never
+// smaller than the leg hit radius, so a click at a break can't fall through
+// to the leg and stack a duplicate break there.
 constexpr qreal leg_gap_mm       = 1.0;
-constexpr qreal leg_break_hit_px = 5.0;
+constexpr qreal leg_break_hit_px = 6.0;
 constexpr qreal leg_line_hit_px  = 6.0;
 
 // IOF Control Description cell size (mm on paper), per ISCD 2004 standard.
@@ -522,8 +525,8 @@ void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to, int en
 
         if (context.interactive)
         {
-            const QRectF bounds(center.x() - leg_break_hit_px, center.y() - leg_break_hit_px,
-                                2.0 * leg_break_hit_px, 2.0 * leg_break_hit_px);
+            const qreal hit_r = qMax(leg_break_hit_px, gap_half);
+            const QRectF bounds(center.x() - hit_r, center.y() - hit_r, 2.0 * hit_r, 2.0 * hit_r);
             break_hit_cache.append(BreakHit { entry_index, b.original_index, bounds });
 
             painter->save();
