@@ -51,6 +51,7 @@
 #include "course/course_control.h"
 #include "course/course_database.h"
 #include "course/course_undo.h"
+#include "course/iscd_symbol_library.h"
 #include "core/map_coord.h"
 #include "core/map_view.h"
 #include "gui/map/map_widget.h"
@@ -1735,28 +1736,38 @@ void CourseOverlay::paintISCDCell(QPainter* painter, const QString& text,
     if (text.isEmpty())
         return;
 
-    const qreal mg = cell.width() * 0.12;
-    const QRectF inner = cell.adjusted(mg, mg, -mg, -mg);
-
     switch (column)
     {
     case 2:  // C: feature part
-        drawISCDPartSymbol(painter, text, inner);
-        break;
     case 3:  // D: main feature
-        drawISCDFeatureSymbol(painter, text, inner);
-        break;
     case 4:  // E: appearance / approach
-        drawISCDApproachSymbol(painter, text, inner);
-        break;
     case 6:  // G: location detail
-        drawISCDLocationSymbol(painter, text, inner);
+        drawISCDCell(painter, column, text, cell, cell.width() * 0.12);
         break;
     default:
         // Text columns: A (seq), B (code), F (dims), H (other)
         painter->setPen(Qt::black);
         painter->drawText(cell, Qt::AlignCenter | Qt::TextSingleLine, text);
         break;
+    }
+}
+
+
+void CourseOverlay::drawISCDCell(QPainter* painter, int column, const QString& text,
+                                 const QRectF& cell, qreal margin)
+{
+    const auto library_column = static_cast<IscdSymbolLibrary::Column>(column);
+    if (IscdSymbolLibrary::draw(painter, IscdSymbolLibrary::code(library_column, text), cell))
+        return;
+
+    const QRectF inner = cell.adjusted(margin, margin, -margin, -margin);
+    switch (column)
+    {
+    case 2: drawISCDPartSymbol(painter, text, inner); break;
+    case 3: drawISCDFeatureSymbol(painter, text, inner); break;
+    case 4: drawISCDApproachSymbol(painter, text, inner); break;
+    case 6: drawISCDLocationSymbol(painter, text, inner); break;
+    default: break;
     }
 }
 

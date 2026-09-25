@@ -10267,11 +10267,11 @@ Continue?</source>
     </message>
     <message>
         <source>N end</source>
-        <translation>Северный торец</translation>
+        <translation>С торец</translation>
     </message>
     <message>
         <source>S end</source>
-        <translation>Южный торец</translation>
+        <translation>Ю торец</translation>
     </message>
     <message>
         <source>Corner (inside)</source>
@@ -10284,6 +10284,214 @@ Continue?</source>
     <message>
         <source>Junction</source>
         <translation>Развилка</translation>
+    </message>
+    <message>
+        <source>Low</source>
+        <translation>Низкий</translation>
+    </message>
+    <message>
+        <source>Needle leaved</source>
+        <translation>Хвойный</translation>
+    </message>
+    <message>
+        <source>Broad leaved</source>
+        <translation>Лиственный</translation>
+    </message>
+    <message>
+        <source>Beneath</source>
+        <translation>Под</translation>
+    </message>
+    <message>
+        <source>N side</source>
+        <translation>С сторона</translation>
+    </message>
+    <message>
+        <source>NE side</source>
+        <translation>С-В сторона</translation>
+    </message>
+    <message>
+        <source>E side</source>
+        <translation>В сторона</translation>
+    </message>
+    <message>
+        <source>SE side</source>
+        <translation>Ю-В сторона</translation>
+    </message>
+    <message>
+        <source>S side</source>
+        <translation>Ю сторона</translation>
+    </message>
+    <message>
+        <source>SW side</source>
+        <translation>Ю-З сторона</translation>
+    </message>
+    <message>
+        <source>W side</source>
+        <translation>З сторона</translation>
+    </message>
+    <message>
+        <source>NW side</source>
+        <translation>С-З сторона</translation>
+    </message>
+    <message>
+        <source>N part</source>
+        <translation>С часть</translation>
+    </message>
+    <message>
+        <source>NE part</source>
+        <translation>С-В часть</translation>
+    </message>
+    <message>
+        <source>E part</source>
+        <translation>В часть</translation>
+    </message>
+    <message>
+        <source>SE part</source>
+        <translation>Ю-В часть</translation>
+    </message>
+    <message>
+        <source>S part</source>
+        <translation>Ю часть</translation>
+    </message>
+    <message>
+        <source>SW part</source>
+        <translation>Ю-З часть</translation>
+    </message>
+    <message>
+        <source>W part</source>
+        <translation>З часть</translation>
+    </message>
+    <message>
+        <source>NW part</source>
+        <translation>С-З часть</translation>
+    </message>
+    <message>
+        <source>NE edge</source>
+        <translation>С-В край</translation>
+    </message>
+    <message>
+        <source>SE edge</source>
+        <translation>Ю-В край</translation>
+    </message>
+    <message>
+        <source>SW edge</source>
+        <translation>Ю-З край</translation>
+    </message>
+    <message>
+        <source>NW edge</source>
+        <translation>С-З край</translation>
+    </message>
+    <message>
+        <source>N corner (inside)</source>
+        <translation>С угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>NE corner (inside)</source>
+        <translation>С-В угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>E corner (inside)</source>
+        <translation>В угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>SE corner (inside)</source>
+        <translation>Ю-В угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>S corner (inside)</source>
+        <translation>Ю угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>SW corner (inside)</source>
+        <translation>Ю-З угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>W corner (inside)</source>
+        <translation>З угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>NW corner (inside)</source>
+        <translation>С-З угол (внутренний)</translation>
+    </message>
+    <message>
+        <source>N corner (outside)</source>
+        <translation>С угол (внешний)</translation>
+    </message>
+    <message>
+        <source>NE corner (outside)</source>
+        <translation>С-В угол (внешний)</translation>
+    </message>
+    <message>
+        <source>E corner (outside)</source>
+        <translation>В угол (внешний)</translation>
+    </message>
+    <message>
+        <source>SE corner (outside)</source>
+        <translation>Ю-В угол (внешний)</translation>
+    </message>
+    <message>
+        <source>S corner (outside)</source>
+        <translation>Ю угол (внешний)</translation>
+    </message>
+    <message>
+        <source>SW corner (outside)</source>
+        <translation>Ю-З угол (внешний)</translation>
+    </message>
+    <message>
+        <source>W corner (outside)</source>
+        <translation>З угол (внешний)</translation>
+    </message>
+    <message>
+        <source>NW corner (outside)</source>
+        <translation>С-З угол (внешний)</translation>
+    </message>
+    <message>
+        <source>NE tip</source>
+        <translation>С-В конец</translation>
+    </message>
+    <message>
+        <source>SE tip</source>
+        <translation>Ю-В конец</translation>
+    </message>
+    <message>
+        <source>SW tip</source>
+        <translation>Ю-З конец</translation>
+    </message>
+    <message>
+        <source>NW tip</source>
+        <translation>С-З конец</translation>
+    </message>
+    <message>
+        <source>NE end</source>
+        <translation>С-В торец</translation>
+    </message>
+    <message>
+        <source>E end</source>
+        <translation>В торец</translation>
+    </message>
+    <message>
+        <source>SE end</source>
+        <translation>Ю-В торец</translation>
+    </message>
+    <message>
+        <source>SW end</source>
+        <translation>Ю-З торец</translation>
+    </message>
+    <message>
+        <source>W end</source>
+        <translation>З торец</translation>
+    </message>
+    <message>
+        <source>NW end</source>
+        <translation>С-З торец</translation>
+    </message>
+    <message>
+        <source>Bend</source>
+        <translation>Изгиб</translation>
+    </message>
+    <message>
+        <source>Between</source>
+        <translation>Между</translation>
     </message>
 </context>
 <context>

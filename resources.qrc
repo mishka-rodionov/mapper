@@ -123,6 +123,7 @@
         <file>images/window-new.png</file>
         <file>images/mapper-icon/Mapper-128.png</file>
         <file alias="doc/tip-of-the-day/tips.txt">doc/tip-of-the-day/tips_en.txt</file>
+        <file alias="symbol-sets/Course_Design_15000.omap">symbol sets/15000/Course_Design_15000.omap</file>
     </qresource>
     <qresource prefix="/" lang="de">
         <file alias="doc/tip-of-the-day/tips.txt">doc/tip-of-the-day/tips_de.txt</file>

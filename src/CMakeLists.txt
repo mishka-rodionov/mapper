@@ -95,6 +95,7 @@ set(Mapper_Common_SRCS
   course/course_overlay.cpp
   course/course_serialization.cpp
   course/course_undo.cpp
+  course/iscd_symbol_library.cpp
 
   core/app_permissions.cpp
   core/autosave.cpp

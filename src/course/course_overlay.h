@@ -118,6 +118,13 @@ public:
     static void drawISCDApproachSymbol(QPainter* painter, const QString& approach, const QRectF& r);
     static void drawISCDLocationSymbol(QPainter* painter, const QString& location, const QRectF& r);
 
+    // Draws a column C, D, E or G value (column index 2, 3, 4 or 6) into a
+    // whole description cell: the standard Course_Design pictogram if there
+    // is one, else the column's drawISCD*Symbol() (custom path or built-in
+    // drawing) into the cell reduced by margin.
+    static void drawISCDCell(QPainter* painter, int column, const QString& text,
+                             const QRectF& cell, qreal margin);
+
     // Custom symbol paths loaded from / saved to JSON (edited in ISCDSymbolEditor)
     static void        loadCustomSymbolPaths(const QString& filePath);
     static void        saveCustomSymbolPaths(const QString& filePath);
