@@ -58,6 +58,7 @@ static const QLatin1String attr_control      ("control");
 static const QLatin1String attr_climb        ("climb");
 static const QLatin1String attr_points       ("points");
 static const QLatin1String attr_breaks       ("breaks");
+static const QLatin1String attr_circle_breaks("circle_breaks");
 static const QLatin1String attr_default_points("default_points");
 static const QLatin1String attr_description_scale("description_scale");
 static const QLatin1String attr_description_columns("description_columns");
@@ -150,6 +151,14 @@ void saveControl(QXmlStreamWriter& xml, const CourseControl& ctrl)
         elem.writeAttribute(attr_number_dx, ctrl.number_offset.x());
         elem.writeAttribute(attr_number_dy, ctrl.number_offset.y());
     }
+    if (!ctrl.circle_breaks.empty())
+    {
+        QStringList parts;
+        parts.reserve(static_cast<int>(ctrl.circle_breaks.size()));
+        for (double t : ctrl.circle_breaks)
+            parts << QString::number(t, 'g', 6);
+        elem.writeAttribute(attr_circle_breaks, parts.join(QLatin1Char(';')));
+    }
     saveDescription(xml, ctrl.description);
 }
 
@@ -214,6 +223,14 @@ CourseControl loadControl(QXmlStreamReader& xml)
     const auto dy = attrs.value(attr_number_dy).toDouble(&dy_ok);
     if (dx_ok && dy_ok)
         ctrl.number_offset = MapCoordF(dx, dy);
+    const QString circle_breaks_str = attrs.value(attr_circle_breaks).toString();
+    for (const auto& part : circle_breaks_str.split(QLatin1Char(';'), QString::SkipEmptyParts))
+    {
+        bool ok = false;
+        const double t = part.toDouble(&ok);
+        if (ok && t >= 0.0 && t < 1.0)
+            ctrl.circle_breaks.push_back(t);
+    }
 
     while (xml.readNextStartElement())
     {

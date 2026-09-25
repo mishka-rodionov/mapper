@@ -76,7 +76,8 @@ public:
 		CourseControlDescEditType    = 103,
 		CoursesChangedType           = 104,
 		CourseControlNumberMovedType = 105,
-		CourseDatabaseReplacedType   = 106
+		CourseDatabaseReplacedType   = 106,
+		CourseControlCircleBreaksType = 107
 	};
 	
 	/**

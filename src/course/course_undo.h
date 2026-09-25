@@ -122,6 +122,27 @@ private:
 
 
 /**
+ * Undo step for when the manual breaks in a control circle were edited.
+ * undo() restores the old list of breaks.
+ */
+class ModifyControlCircleBreaksUndoStep : public UndoStep
+{
+public:
+    ModifyControlCircleBreaksUndoStep(Map* map, QString control_id, std::vector<double> old_breaks);
+    ~ModifyControlCircleBreaksUndoStep() override = default;
+
+    UndoStep* undo() override;
+
+protected:
+    void saveImpl(QXmlStreamWriter& xml) const override;
+
+private:
+    QString             control_id;
+    std::vector<double> old_breaks;
+};
+
+
+/**
  * Undo step for when a control's IOF description was edited.
  * undo() restores the old description.
  */

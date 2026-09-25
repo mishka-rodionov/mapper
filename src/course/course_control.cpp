@@ -40,7 +40,8 @@ bool CourseControl::operator==(const CourseControl& other) const noexcept
         && position      == other.position
         && number_offset == other.number_offset
         && type          == other.type
-        && description   == other.description;
+        && description   == other.description
+        && circle_breaks == other.circle_breaks;
 }
 
 

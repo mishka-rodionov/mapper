@@ -20,6 +20,8 @@
 #ifndef OPENORIENTEERING_COURSE_CONTROL_H
 #define OPENORIENTEERING_COURSE_CONTROL_H
 
+#include <vector>
+
 #include <QString>
 
 #include "core/map_coord.h"
@@ -70,6 +72,14 @@ struct CourseControl
     MapCoordF    number_offset;                 ///< Additional number label offset in native map coordinates (1/1000 mm)
     ControlType  type = ControlType::Regular;   ///< Role of the control
     ControlDescription description;            ///< IOF control description
+
+    /**
+     * Manually placed gaps in the control circle, as fractions of a full turn
+     * in [0, 1), measured from the map's +x axis in map coordinates (so they
+     * stay put when the control is moved or the view is rotated). Lets the
+     * user break the circle where it would hide an important map feature.
+     */
+    std::vector<double> circle_breaks;
 
     bool operator==(const CourseControl& other) const noexcept;
     bool operator!=(const CourseControl& other) const noexcept { return !(*this == other); }

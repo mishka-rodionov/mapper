@@ -228,6 +228,42 @@ void ModifyControlDescriptionUndoStep::saveImpl(QXmlStreamWriter& xml) const
 
 
 // ============================================================
+// ModifyControlCircleBreaksUndoStep
+// ============================================================
+
+ModifyControlCircleBreaksUndoStep::ModifyControlCircleBreaksUndoStep(
+        Map* map,
+        QString control_id,
+        std::vector<double> old_breaks)
+: UndoStep(CourseControlCircleBreaksType, map)
+, control_id(std::move(control_id))
+, old_breaks(std::move(old_breaks))
+{}
+
+UndoStep* ModifyControlCircleBreaksUndoStep::undo()
+{
+    CourseDatabase& db = map->courseDatabase();
+    for (int i = 0; i < db.numControls(); ++i)
+    {
+        if (db.control(i).id != control_id)
+            continue;
+
+        auto updated = db.control(i);
+        auto current_breaks = std::move(updated.circle_breaks);
+        updated.circle_breaks = old_breaks;
+        db.updateControl(i, std::move(updated));
+        return new ModifyControlCircleBreaksUndoStep(map, control_id, std::move(current_breaks));
+    }
+    return new NoOpUndoStep(map, true);
+}
+
+void ModifyControlCircleBreaksUndoStep::saveImpl(QXmlStreamWriter& xml) const
+{
+    UndoStep::saveImpl(xml);
+}
+
+
+// ============================================================
 // CoursesChangedUndoStep
 // ============================================================
 

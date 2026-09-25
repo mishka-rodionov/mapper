@@ -123,6 +123,8 @@ constexpr qreal number_offset_mm    = 3.5;
 // smaller than the leg hit radius, so a click at a break can't fall through
 // to the leg and stack a duplicate break there.
 constexpr qreal leg_gap_mm       = 1.0;
+// Blank space left between the end of a leg and the control symbol it joins.
+constexpr qreal leg_end_gap_mm   = 1.0;
 constexpr qreal leg_break_hit_px = 6.0;
 constexpr qreal leg_line_hit_px  = 6.0;
 
@@ -248,6 +250,24 @@ bool tryDrawCustomPath(QPainter* painter, const QString& key, const QRectF& rect
     return true;
 }
 
+// Distance (mm) from a control's position to the outer edge of its symbol,
+// including half the stroke, i.e. where a leg would touch the symbol.
+qreal symbolEdgeRadiusMm(ControlType type)
+{
+    switch (type)
+    {
+    case ControlType::Start:
+        return triangle_size_mm / std::sqrt(3.0) + line_width_mm / 2.0;  // circumradius
+    case ControlType::Finish:
+        return finish_outer_mm / 2.0 + line_width_mm / 2.0;
+    case ControlType::CrossingPoint:
+        return 2.5 * std::sqrt(2.0) + line_width_mm / 2.0;               // tip of the X arms
+    case ControlType::Regular:
+        break;
+    }
+    return circle_diameter_mm / 2.0 + line_width_mm / 2.0;
+}
+
 }  // anonymous namespace
 
 
@@ -299,6 +319,12 @@ void CourseOverlay::setPlanningActive(bool active)
         break_drag_before.clear();
         leg_hit_cache.clear();
         break_hit_cache.clear();
+        circle_break_dragging = false;
+        circle_break_drag_control_id.clear();
+        circle_break_drag_index = -1;
+        circle_break_drag_before.clear();
+        circle_hit_cache.clear();
+        circle_break_hit_cache.clear();
     }
 
     widget->updateEverything();
@@ -337,6 +363,8 @@ void CourseOverlay::paint(QPainter* painter, const PaintContext& context)
         number_hit_cache.clear();
         leg_hit_cache.clear();
         break_hit_cache.clear();
+        circle_hit_cache.clear();
+        circle_break_hit_cache.clear();
         if (!planning_active)
             return;
     }
@@ -386,6 +414,7 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course, const P
         {
             const int entry_index = resolved_entry_idx[i];
             paintLeg(painter, toViewport(*resolved[i-1], context), toViewport(*resolved[i], context),
+                     symbolEdgeRadiusMm(resolved[i-1]->type), symbolEdgeRadiusMm(resolved[i]->type),
                      entry_index, course.entries[std::size_t(entry_index)].leg_breaks, context);
         }
     }
@@ -460,22 +489,24 @@ void CourseOverlay::paintAllControls(QPainter* painter, const PaintContext& cont
 
 // --- Individual symbol painters ---
 
-void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to, int entry_index,
+void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to,
+                             qreal from_radius_mm, qreal to_radius_mm, int entry_index,
                              const std::vector<double>& breaks, const PaintContext& context) const
 {
     const qreal lw = mmToViewportPx(line_width_mm, context);
     painter->setPen(QPen(course_purple, lw));
     painter->setBrush(Qt::NoBrush);
 
-    const qreal r = mmToViewportPx(circle_diameter_mm / 2.0, context);
+    // Legs stop short of the symbols they join, leaving a small blank gap.
+    const qreal r_from = mmToViewportPx(from_radius_mm + leg_end_gap_mm, context);
+    const qreal r_to   = mmToViewportPx(to_radius_mm + leg_end_gap_mm, context);
     QPointF d = to - from;
     const qreal len = std::sqrt(d.x() * d.x() + d.y() * d.y());
-    if (len < 2 * r)
+    if (len < r_from + r_to)
         return;
 
-    const qreal f = r / len;
-    const QPointF start = from + f * d;
-    const QPointF end   = to   - f * d;
+    const QPointF start = from + (r_from / len) * d;
+    const QPointF end   = to   - (r_to / len) * d;
 
     if (context.interactive)
         leg_hit_cache.append(LegHit { entry_index, start, end });
@@ -572,9 +603,77 @@ void CourseOverlay::paintControl(QPainter* painter, QPointF pos, const CourseCon
 
     painter->setPen(QPen(course_purple, lw));
     painter->setBrush(Qt::NoBrush);
-    painter->drawEllipse(pos, r, r);
+    paintControlCircle(painter, pos, r, ctrl, context);
 
     paintControlNumber(painter, pos, ctrl, number, context);
+}
+
+void CourseOverlay::paintControlCircle(QPainter* painter, QPointF pos, qreal r, const CourseControl& ctrl, const PaintContext& context) const
+{
+    const qreal rotation = viewRotation(MapCoordF(ctrl.position), context);
+    if (context.interactive)
+        circle_hit_cache.append(CircleHit { ctrl.id, pos, r, rotation });
+
+    if (ctrl.circle_breaks.empty() || r < 1e-6)
+    {
+        painter->drawEllipse(pos, r, r);
+        return;
+    }
+
+    // Same gap length as leg breaks, expressed as a half-angle on this circle.
+    const qreal gap_half_px = mmToViewportPx(leg_gap_mm, context) / 2.0;
+    const qreal gap_half = qMin(gap_half_px / r, M_PI);
+
+    struct SortedBreak { double t; int original_index; };
+    std::vector<SortedBreak> sorted;
+    sorted.reserve(ctrl.circle_breaks.size());
+    for (int i = 0; i < static_cast<int>(ctrl.circle_breaks.size()); ++i)
+        sorted.push_back({ ctrl.circle_breaks[std::size_t(i)], i });
+    std::sort(sorted.begin(), sorted.end(), [](const SortedBreak& a, const SortedBreak& b) { return a.t < b.t; });
+
+    auto pointAt = [&](qreal angle) { return pos + r * QPointF(std::cos(angle), std::sin(angle)); };
+
+    // Draw the arcs between consecutive gaps, wrapping around after the last one.
+    const int n = static_cast<int>(sorted.size());
+    for (int i = 0; i < n; ++i)
+    {
+        const qreal from = 2.0 * M_PI * sorted[std::size_t(i)].t + rotation + gap_half;
+        qreal to = 2.0 * M_PI * sorted[std::size_t((i + 1) % n)].t + rotation - gap_half;
+        if (i + 1 == n)
+            to += 2.0 * M_PI;
+        if (to <= from)
+            continue;
+
+        const int steps = qMax(2, static_cast<int>(std::ceil((to - from) / (2.0 * M_PI) * 96.0)));
+        QPolygonF arc;
+        arc.reserve(steps + 1);
+        for (int k = 0; k <= steps; ++k)
+            arc << pointAt(from + (to - from) * k / steps);
+        painter->drawPolyline(arc);
+    }
+
+    if (!context.interactive)
+        return;
+
+    const qreal hit_r = qMax(leg_break_hit_px, gap_half_px);
+    for (const auto& b : sorted)
+    {
+        const QPointF center = pointAt(2.0 * M_PI * b.t + rotation);
+        const QRectF bounds(center.x() - hit_r, center.y() - hit_r, 2.0 * hit_r, 2.0 * hit_r);
+        circle_break_hit_cache.append(CircleBreakHit { ctrl.id, b.original_index, bounds });
+
+        painter->save();
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(course_purple);
+        painter->drawEllipse(center, 2.0, 2.0);
+        painter->restore();
+    }
+}
+
+qreal CourseOverlay::viewRotation(const MapCoordF& at, const PaintContext& context) const
+{
+    const QPointF d = toViewport(MapCoordF(at.x() + 1.0, at.y()), context) - toViewport(at, context);
+    return std::atan2(d.y(), d.x());
 }
 
 void CourseOverlay::paintFinish(QPainter* painter, QPointF pos, const PaintContext& context) const
@@ -766,6 +865,84 @@ void CourseOverlay::removeLegBreak(int entry_index, int break_index)
 }
 
 
+// --- Circle break editing ---
+
+const CourseOverlay::CircleHit* CourseOverlay::circleHitAt(const QPoint& pos) const
+{
+    for (int i = circle_hit_cache.size() - 1; i >= 0; --i)
+    {
+        const auto& hit = circle_hit_cache[i];
+        const QPointF d = QPointF(pos) - hit.center;
+        const qreal dist = std::sqrt(QPointF::dotProduct(d, d));
+        if (std::abs(dist - hit.radius) <= leg_line_hit_px)
+            return &hit;
+    }
+    return nullptr;
+}
+
+const CourseOverlay::CircleBreakHit* CourseOverlay::circleBreakHitAt(const QPoint& pos) const
+{
+    for (const auto& hit : circle_break_hit_cache)
+    {
+        if (hit.bounds.contains(pos))
+            return &hit;
+    }
+    return nullptr;
+}
+
+double CourseOverlay::circleFractionAt(const CircleHit& hit, const QPoint& pos)
+{
+    const QPointF d = QPointF(pos) - hit.center;
+    double t = (std::atan2(d.y(), d.x()) - hit.view_rotation) / (2.0 * M_PI);
+    t -= std::floor(t);
+    return t < 1.0 ? t : 0.0;
+}
+
+void CourseOverlay::setCircleBreaks(const QString& control_id, std::vector<double> breaks)
+{
+    const int index = controlIndex(control_id);
+    if (index < 0)
+        return;
+
+    auto updated = db.control(index);
+    updated.circle_breaks = std::move(breaks);
+    db.updateControl(index, std::move(updated));
+}
+
+void CourseOverlay::addCircleBreak(const QString& control_id, double t)
+{
+    const int index = controlIndex(control_id);
+    if (index < 0)
+        return;
+
+    auto old_breaks = db.control(index).circle_breaks;
+    auto breaks = old_breaks;
+    breaks.push_back(t);
+    setCircleBreaks(control_id, std::move(breaks));
+
+    auto* map = widget->getMapView()->getMap();
+    map->push(new ModifyControlCircleBreaksUndoStep(map, control_id, std::move(old_breaks)));
+}
+
+void CourseOverlay::removeCircleBreak(const QString& control_id, int break_index)
+{
+    const int index = controlIndex(control_id);
+    if (index < 0)
+        return;
+
+    auto old_breaks = db.control(index).circle_breaks;
+    if (break_index < 0 || break_index >= static_cast<int>(old_breaks.size()))
+        return;
+
+    auto breaks = old_breaks;
+    breaks.erase(breaks.begin() + break_index);
+    setCircleBreaks(control_id, std::move(breaks));
+
+    auto* map = widget->getMapView()->getMap();
+    map->push(new ModifyControlCircleBreaksUndoStep(map, control_id, std::move(old_breaks)));
+}
+
+
 // --- Coordinate conversion ---
 
 QPointF CourseOverlay::toViewport(const CourseControl& ctrl, const PaintContext& context) const
@@ -822,9 +999,20 @@ bool CourseOverlay::mousePressEvent(QMouseEvent* event)
     // removes it, on the line itself it adds a new one at the clicked point.
     if (event->button() == Qt::RightButton && visible_course)
     {
+        if (const auto* hit = circleBreakHitAt(event->pos()))
+        {
+            removeCircleBreak(hit->control_id, hit->break_index);
+            return true;
+        }
         if (const auto* hit = breakHitAt(event->pos()))
         {
             removeLegBreak(hit->entry_index, hit->break_index);
+            return true;
+        }
+        if (const auto* hit = circleHitAt(event->pos()))
+        {
+            const auto control_id = hit->control_id;
+            addCircleBreak(control_id, circleFractionAt(*hit, event->pos()));
             return true;
         }
         if (const auto* hit = legHitAt(event->pos()))
@@ -842,6 +1030,20 @@ bool CourseOverlay::mousePressEvent(QMouseEvent* event)
 
     if (event->button() != Qt::LeftButton)
         return false;
+
+    if (const auto* hit = circleBreakHitAt(event->pos()))
+    {
+        const int index = controlIndex(hit->control_id);
+        if (index < 0)
+            return false;
+
+        circle_break_dragging = true;
+        circle_break_drag_control_id = hit->control_id;
+        circle_break_drag_index = hit->break_index;
+        circle_break_drag_before = db.control(index).circle_breaks;
+        widget->setCursor(Qt::ClosedHandCursor);
+        return true;
+    }
 
     if (const auto* hit = breakHitAt(event->pos()))
     {
@@ -898,6 +1100,30 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
 {
     if (!planning_active)
         return false;
+
+    if (circle_break_dragging)
+    {
+        for (const auto& hit : circle_hit_cache)
+        {
+            if (hit.control_id != circle_break_drag_control_id)
+                continue;
+
+            const int index = controlIndex(circle_break_drag_control_id);
+            if (index < 0)
+                break;
+
+            auto breaks = db.control(index).circle_breaks;
+            if (circle_break_drag_index < 0 || circle_break_drag_index >= static_cast<int>(breaks.size()))
+                break;
+
+            breaks[std::size_t(circle_break_drag_index)] = circleFractionAt(hit, event->pos());
+            setCircleBreaks(circle_break_drag_control_id, std::move(breaks));
+            break;
+        }
+
+        widget->setCursor(Qt::ClosedHandCursor);
+        return true;
+    }
 
     if (break_dragging)
     {
@@ -994,13 +1220,13 @@ bool CourseOverlay::mouseMoveEvent(QMouseEvent* event)
         return false;
     }
 
-    if (breakHitAt(event->pos()))
+    if (circleBreakHitAt(event->pos()) || breakHitAt(event->pos()))
     {
         widget->setCursor(Qt::OpenHandCursor);
         return false;
     }
 
-    if (legHitAt(event->pos()))
+    if (circleHitAt(event->pos()) || legHitAt(event->pos()))
     {
         widget->setCursor(Qt::CrossCursor);
         return false;
@@ -1013,6 +1239,24 @@ bool CourseOverlay::mouseReleaseEvent(QMouseEvent* event)
 {
     if (!planning_active)
         return false;
+
+    if (circle_break_dragging && event->button() == Qt::LeftButton)
+    {
+        const int index = controlIndex(circle_break_drag_control_id);
+        if (index >= 0 && db.control(index).circle_breaks != circle_break_drag_before)
+        {
+            auto* map = widget->getMapView()->getMap();
+            map->push(new ModifyControlCircleBreaksUndoStep(
+                map, circle_break_drag_control_id, std::move(circle_break_drag_before)));
+        }
+
+        circle_break_dragging = false;
+        circle_break_drag_control_id.clear();
+        circle_break_drag_index = -1;
+        circle_break_drag_before.clear();
+        widget->setCursor(Qt::ArrowCursor);
+        return true;
+    }
 
     if (break_dragging && event->button() == Qt::LeftButton)
     {

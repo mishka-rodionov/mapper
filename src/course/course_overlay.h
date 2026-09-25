@@ -160,6 +160,24 @@ private:
         QRectF bounds;
     };
 
+    /** A regular control circle, cached each paint for hit-testing right-clicks
+     *  that add a manual circle break. */
+    struct CircleHit
+    {
+        QString control_id;
+        QPointF center;      ///< Viewport position
+        qreal radius;        ///< Viewport px
+        qreal view_rotation; ///< Viewport angle minus map angle (radians)
+    };
+
+    /** One existing manual circle break marker, cached each paint for hit-testing. */
+    struct CircleBreakHit
+    {
+        QString control_id;
+        int break_index;  ///< Index into CourseControl::circle_breaks
+        QRectF bounds;
+    };
+
     /** One row of the IOF control description table (one regular control). */
     struct DescriptionRow
     {
@@ -180,10 +198,14 @@ private:
     void paintCourse(QPainter* painter, const Course& course, const PaintContext& context) const;
     void paintAllControls(QPainter* painter, const PaintContext& context) const;
 
-    void paintLeg(QPainter* painter, QPointF from, QPointF to, int entry_index,
+    void paintLeg(QPainter* painter, QPointF from, QPointF to,
+                  qreal from_radius_mm, qreal to_radius_mm, int entry_index,
                   const std::vector<double>& breaks, const PaintContext& context) const;
     void paintStart(QPainter* painter, QPointF pos, double rotation_rad, const PaintContext& context) const;
     void paintControl(QPainter* painter, QPointF pos, const CourseControl& ctrl, const QString& number, const PaintContext& context) const;
+    void paintControlCircle(QPainter* painter, QPointF pos, qreal r, const CourseControl& ctrl, const PaintContext& context) const;
+    /** Angle (radians) by which map directions are rotated in the viewport at the given point. */
+    qreal viewRotation(const MapCoordF& at, const PaintContext& context) const;
     void paintFinish(QPainter* painter, QPointF pos, const PaintContext& context) const;
     void paintCrossingPoint(QPainter* painter, QPointF pos, const PaintContext& context) const;
     void paintControlNumber(QPainter* painter, QPointF center, const CourseControl& ctrl, const QString& number, const PaintContext& context) const;
@@ -202,6 +224,15 @@ private:
     std::vector<Course> coursesSnapshot() const;
     void addLegBreak(int entry_index, double t);
     void removeLegBreak(int entry_index, int break_index);
+
+    // --- Circle break editing ---
+    const CircleHit* circleHitAt(const QPoint& pos) const;
+    const CircleBreakHit* circleBreakHitAt(const QPoint& pos) const;
+    /** Map-frame position of pos around the hit circle, as a fraction of a turn in [0, 1). */
+    static double circleFractionAt(const CircleHit& hit, const QPoint& pos);
+    void setCircleBreaks(const QString& control_id, std::vector<double> breaks);
+    void addCircleBreak(const QString& control_id, double t);
+    void removeCircleBreak(const QString& control_id, int break_index);
 
     /** Index of the legend block whose bounds contain pos, or -1 if none. */
     int legendBlockAt(const QPoint& pos) const;
@@ -286,6 +317,14 @@ private:
     int break_drag_entry_index = -1;
     int break_drag_break_index = -1;
     std::vector<Course> break_drag_before;
+
+    // --- Circle break editing state ---
+    mutable QVector<CircleHit> circle_hit_cache;
+    mutable QVector<CircleBreakHit> circle_break_hit_cache;
+    bool circle_break_dragging = false;
+    QString circle_break_drag_control_id;
+    int circle_break_drag_index = -1;
+    std::vector<double> circle_break_drag_before;
 };
 
 

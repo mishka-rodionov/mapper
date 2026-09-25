@@ -80,6 +80,7 @@ void CourseTest::roundtrip()
         ctrl.description.feature   = QStringLiteral("boulder");
         ctrl.description.location_detail = QStringLiteral("foot");
         ctrl.description.dimensions = QStringLiteral("2x1");
+        ctrl.circle_breaks         = { 0.125, 0.75 };
         original.addControl(ctrl);
     }
 
@@ -153,6 +154,7 @@ void CourseTest::roundtrip()
         QCOMPARE(l.id,           o.id);
         QCOMPARE(l.type,         o.type);
         QCOMPARE(l.position,     o.position);
+        QCOMPARE(l.circle_breaks, o.circle_breaks);
 
         QCOMPARE(l.description.code,            o.description.code);
         QCOMPARE(l.description.feature_part,    o.description.feature_part);
