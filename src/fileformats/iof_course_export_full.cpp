@@ -39,6 +39,31 @@
 
 namespace OpenOrienteering {
 
+namespace {
+
+/**
+ * Returns the Id under which a control is written to the XML file.
+ *
+ * The default start "S1" is written as "240" and the default finish "F1"
+ * as "245", unless another control already uses that Id. All other Ids
+ * are kept.
+ */
+QString exportId(const CourseControl& ctrl, const CourseDatabase& db)
+{
+    QString id;
+    if (ctrl.type == ControlType::Start && ctrl.id == QLatin1String("S1"))
+        id = QStringLiteral("240");
+    else if (ctrl.type == ControlType::Finish && ctrl.id == QLatin1String("F1"))
+        id = QStringLiteral("245");
+    else
+        return ctrl.id;
+
+    return db.findById(id) ? ctrl.id : id;
+}
+
+}  // namespace
+
+
 // static
 QString IofCourseExportFull::formatDescription()
 {
@@ -119,15 +144,15 @@ void IofCourseExportFull::writeControls(const CourseDatabase& db)
                       "Control positions will be omitted from the export."));
 
     for (int i = 0; i < db.numControls(); ++i)
-        writeSingleControl(db.control(i), georef_ok);
+        writeSingleControl(db.control(i), db, georef_ok);
 }
 
 
-void IofCourseExportFull::writeSingleControl(const CourseControl& ctrl, bool georef_ok)
+void IofCourseExportFull::writeSingleControl(const CourseControl& ctrl, const CourseDatabase& db, bool georef_ok)
 {
     XmlElementWriter control(*xml, QLatin1String("Control"));
 
-    xml->writeTextElement(QLatin1String("Id"), ctrl.id);
+    xml->writeTextElement(QLatin1String("Id"), exportId(ctrl, db));
 
     // Geographic position (only if georeferenced)
     if (georef_ok)
@@ -200,7 +225,7 @@ void IofCourseExportFull::writeCourse(const Course& course, const CourseDatabase
 
         XmlElementWriter cc(*xml, QLatin1String("CourseControl"));
         cc.writeAttribute(QLatin1String("type"), type_str);
-        xml->writeTextElement(QLatin1String("Control"), entry.control_id);
+        xml->writeTextElement(QLatin1String("Control"), ctrl ? exportId(*ctrl, db) : entry.control_id);
         if (course.type == CourseType::Score && type_str == QLatin1String("Control"))
             xml->writeTextElement(QLatin1String("Score"), QString::number(entry.points));
     }

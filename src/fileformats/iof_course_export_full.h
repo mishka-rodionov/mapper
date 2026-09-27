@@ -63,7 +63,7 @@ protected:
 private:
     void writeDocument(const CourseDatabase& db);
     void writeControls(const CourseDatabase& db);
-    void writeSingleControl(const CourseControl& ctrl, bool georef_ok);
+    void writeSingleControl(const CourseControl& ctrl, const CourseDatabase& db, bool georef_ok);
     void writeCourse(const Course& course, const CourseDatabase& db);
     void writePosition(const LatLon& latlon);
 
