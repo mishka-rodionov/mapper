@@ -710,10 +710,24 @@ void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const 
     font.setBold(true);
     painter->setFont(font);
 
-    painter->setPen(course_purple);
-
     const QPointF text_pos = numberTextPosition(center, ctrl, context);
-    painter->drawText(text_pos, number);
+
+    // White halo around the digits for readability over map detail:
+    // stroke the glyph outlines with a wide white pen, then fill in purple.
+    QPainterPath text_path;
+    text_path.addText(text_pos, font, number);
+    const qreal halo_w = std::max(mmToViewportPx(0.5, context), 1.5);
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(QPen(Qt::white, halo_w, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter->setBrush(Qt::NoBrush);
+    painter->drawPath(text_path);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(course_purple);
+    painter->drawPath(text_path);
+    painter->restore();
+
     rememberNumberHit(painter, ctrl, number, text_pos, context);
 }
 
