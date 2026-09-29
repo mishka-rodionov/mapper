@@ -24,6 +24,7 @@
 #include <Qt>
 #include <QDateTime>
 #include <QLatin1String>
+#include <QStringList>
 #include <QXmlStreamWriter>
 
 #include "mapper_config.h"
@@ -38,31 +39,6 @@
 
 
 namespace OpenOrienteering {
-
-namespace {
-
-/**
- * Returns the Id under which a control is written to the XML file.
- *
- * The default start "S1" is written as "240" and the default finish "F1"
- * as "245", unless another control already uses that Id. All other Ids
- * are kept.
- */
-QString exportId(const CourseControl& ctrl, const CourseDatabase& db)
-{
-    QString id;
-    if (ctrl.type == ControlType::Start && ctrl.id == QLatin1String("S1"))
-        id = QStringLiteral("240");
-    else if (ctrl.type == ControlType::Finish && ctrl.id == QLatin1String("F1"))
-        id = QStringLiteral("245");
-    else
-        return ctrl.id;
-
-    return db.findById(id) ? ctrl.id : id;
-}
-
-}  // namespace
-
 
 // static
 QString IofCourseExportFull::formatDescription()
@@ -95,6 +71,9 @@ bool IofCourseExportFull::exportImplementation()
         return false;
     }
 
+    if (!assignExportIds(db))
+        return false;
+
     QXmlStreamWriter writer(device());
     writer.setAutoFormatting(true);
     xml = &writer;
@@ -104,6 +83,69 @@ bool IofCourseExportFull::exportImplementation()
     xml = nullptr;
 
     return true;
+}
+
+
+bool IofCourseExportFull::assignExportIds(const CourseDatabase& db)
+{
+    export_ids.clear();
+
+    // The code from column B is the number on the control flag and station,
+    // and it is what the panel and the map show. Controls without a code
+    // keep their internal id.
+    QHash<QString, int> uses;
+    for (int i = 0; i < db.numControls(); ++i)
+    {
+        const auto& ctrl = db.control(i);
+        if (ctrl.type == ControlType::CrossingPoint)
+            continue;
+        const auto code = ctrl.description.code.trimmed();
+        const auto id = code.isEmpty() ? ctrl.id : code;
+        export_ids.insert(ctrl.id, id);
+        ++uses[id];
+    }
+
+    // Competra expects the default start and finish stations as 240 and 245.
+    const auto use_station_number = [&](const QString& control_id, const QString& number) {
+        const auto* ctrl = db.findById(control_id);
+        if (!ctrl || !ctrl->description.code.trimmed().isEmpty() || uses.contains(number))
+            return;
+        --uses[control_id];
+        export_ids.insert(control_id, number);
+        ++uses[number];
+    };
+    if (const auto* start = db.findById(QStringLiteral("S1")))
+    {
+        if (start->type == ControlType::Start)
+            use_station_number(start->id, QStringLiteral("240"));
+    }
+    if (const auto* finish = db.findById(QStringLiteral("F1")))
+    {
+        if (finish->type == ControlType::Finish)
+            use_station_number(finish->id, QStringLiteral("245"));
+    }
+
+    QStringList duplicates;
+    for (auto it = uses.constBegin(); it != uses.constEnd(); ++it)
+    {
+        if (it.value() > 1)
+            duplicates.append(it.key());
+    }
+    if (!duplicates.isEmpty())
+    {
+        duplicates.sort();
+        addWarning(tr("Several controls have the same code: %1. "
+                      "Give each control its own code (column B) in the Course Planning panel.")
+                   .arg(duplicates.join(QLatin1String(", "))));
+        return false;
+    }
+    return true;
+}
+
+
+QString IofCourseExportFull::exportId(const CourseControl& ctrl) const
+{
+    return export_ids.value(ctrl.id, ctrl.id);
 }
 
 
@@ -144,15 +186,18 @@ void IofCourseExportFull::writeControls(const CourseDatabase& db)
                       "Control positions will be omitted from the export."));
 
     for (int i = 0; i < db.numControls(); ++i)
-        writeSingleControl(db.control(i), db, georef_ok);
+    {
+        if (db.control(i).type != ControlType::CrossingPoint)
+            writeSingleControl(db.control(i), georef_ok);
+    }
 }
 
 
-void IofCourseExportFull::writeSingleControl(const CourseControl& ctrl, const CourseDatabase& db, bool georef_ok)
+void IofCourseExportFull::writeSingleControl(const CourseControl& ctrl, bool georef_ok)
 {
     XmlElementWriter control(*xml, QLatin1String("Control"));
 
-    xml->writeTextElement(QLatin1String("Id"), exportId(ctrl, db));
+    xml->writeTextElement(QLatin1String("Id"), exportId(ctrl));
 
     // Geographic position (only if georeferenced)
     if (georef_ok)
@@ -218,14 +263,14 @@ void IofCourseExportFull::writeCourse(const Course& course, const CourseDatabase
             {
             case ControlType::Start:         type_str = QLatin1String("Start");   break;
             case ControlType::Finish:        type_str = QLatin1String("Finish");  break;
-            case ControlType::CrossingPoint: type_str = QLatin1String("CrossingPoint"); break;
+            case ControlType::CrossingPoint: continue;  // No station to punch
             default:                         type_str = QLatin1String("Control"); break;
             }
         }
 
         XmlElementWriter cc(*xml, QLatin1String("CourseControl"));
         cc.writeAttribute(QLatin1String("type"), type_str);
-        xml->writeTextElement(QLatin1String("Control"), ctrl ? exportId(*ctrl, db) : entry.control_id);
+        xml->writeTextElement(QLatin1String("Control"), ctrl ? exportId(*ctrl) : entry.control_id);
         if (course.type == CourseType::Score && type_str == QLatin1String("Control"))
             xml->writeTextElement(QLatin1String("Score"), QString::number(entry.points));
     }

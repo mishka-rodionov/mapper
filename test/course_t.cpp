@@ -37,6 +37,7 @@
 #include "course/course_database.h"
 #include "course/course_serialization.h"
 #include "course/course_text_substitution.h"
+#include "fileformats/iof_course_export_full.h"
 #include "fileformats/xml_file_format_p.h"
 #include "gui/course/competra_export_dialog.h"
 
@@ -441,6 +442,85 @@ void CourseTest::competraCornersInPng()
 #else
     QSKIP("Requires Qt Print Support");
 #endif
+}
+
+
+void CourseTest::iofExportIds()
+{
+    Map map;
+    auto& db = map.courseDatabase();
+    const auto add = [&db](const char* id, ControlType type, const char* code) {
+        CourseControl ctrl;
+        ctrl.id = QString::fromLatin1(id);
+        ctrl.type = type;
+        ctrl.position = MapCoord::fromNative(1000 * db.numControls(), 0);
+        ctrl.description.code = QString::fromLatin1(code);
+        db.addControl(ctrl);
+    };
+    add("S1", ControlType::Start,         "");
+    add("31", ControlType::Regular,       "101");
+    add("32", ControlType::CrossingPoint, "");
+    add("33", ControlType::Regular,       "");
+    add("F1", ControlType::Finish,        "");
+
+    Course course;
+    course.name = QStringLiteral("M21");
+    for (const char* id : { "S1", "31", "32", "33", "F1" })
+        course.entries.push_back({ QString::fromLatin1(id) });
+    db.addCourse(course);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto path = dir.filePath(QStringLiteral("courses.xml"));
+
+    // Ids of the control definitions (<Id>) or of the course's controls
+    // (<CourseControl><Control>), in file order.
+    const auto read_ids = [&path](bool course_controls) {
+        QStringList ids;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly))
+            return ids;
+        QXmlStreamReader xml(&file);
+        while (!xml.atEnd())
+        {
+            xml.readNext();
+            if (!xml.isStartElement())
+                continue;
+            if (!course_controls && xml.name() == QLatin1String("Id"))
+                ids.append(xml.readElementText());
+            if (course_controls && xml.name() == QLatin1String("CourseControl"))
+            {
+                while (xml.readNextStartElement())
+                {
+                    if (xml.name() == QLatin1String("Control"))
+                        ids.append(xml.readElementText());
+                    else
+                        xml.skipCurrentElement();
+                }
+            }
+        }
+        return ids;
+    };
+
+    {
+        IofCourseExportFull exporter(path, &map, nullptr);
+        QVERIFY(exporter.doExport());
+    }
+    // Code from column B wins over the internal id, the default start and
+    // finish become 240 and 245, and the crossing point is left out.
+    const auto expected = QStringList{ QStringLiteral("240"), QStringLiteral("101"),
+                                       QStringLiteral("33"), QStringLiteral("245") };
+    QCOMPARE(read_ids(false), expected);
+    QCOMPARE(read_ids(true), expected);
+
+    // Two controls with the same code cannot be told apart by the stations.
+    db.findById(QStringLiteral("33"))->description.code = QStringLiteral("101");
+    {
+        IofCourseExportFull exporter(dir.filePath(QStringLiteral("duplicate.xml")), &map, nullptr);
+        QVERIFY(!exporter.doExport());
+        QVERIFY(!exporter.warnings().empty());
+        QVERIFY(exporter.warnings().back().contains(QLatin1String("101")));
+    }
 }
 
 

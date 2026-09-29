@@ -10872,6 +10872,11 @@ Continue?</source>
         <source>The map has no valid georeferencing. Control positions will be omitted from the export.</source>
         <translation>У карты нет корректной геопривязки. Позиции КП будут исключены из экспорта.</translation>
     </message>
+    <message>
+        <location filename="../src/fileformats/iof_course_export_full.cpp" line="137"/>
+        <source>Several controls have the same code: %1. Give each control its own code (column B) in the Course Planning panel.</source>
+        <translation>У нескольких КП одинаковый код: %1. Задайте каждому КП свой код (столбец B) в панели планирования дистанций.</translation>
+    </message>
 </context>
 <context>
     <name>ImportExport</name>

@@ -20,6 +20,7 @@
 #ifndef OPENORIENTEERING_IOF_COURSE_EXPORT_FULL_H
 #define OPENORIENTEERING_IOF_COURSE_EXPORT_FULL_H
 
+#include <QHash>
 #include <QString>
 
 #include "fileformats/file_import_export.h"
@@ -45,6 +46,11 @@ class MapView;
  *    columns B-H).
  *  - One <Course> element per course with <CourseControl> child elements.
  *
+ * A control is identified by its code (description column B), as shown in the
+ * Course Planning panel and on the map, and by its internal id if the code is
+ * empty. Crossing points are not exported: they are drawn on the map, but
+ * there is no station to punch.
+ *
  * Unlike IofCourseExport (which exports a single hand-drawn path),
  * this exporter reads directly from the CourseDatabase.
  */
@@ -61,13 +67,23 @@ protected:
     bool exportImplementation() override;
 
 private:
+    /**
+     * Fills export_ids. Returns false (with a warning) if two controls would
+     * be exported with the same Id.
+     */
+    bool assignExportIds(const CourseDatabase& db);
+    
+    /** Returns the Id under which the control is written to the XML file. */
+    QString exportId(const CourseControl& ctrl) const;
+    
     void writeDocument(const CourseDatabase& db);
     void writeControls(const CourseDatabase& db);
-    void writeSingleControl(const CourseControl& ctrl, const CourseDatabase& db, bool georef_ok);
+    void writeSingleControl(const CourseControl& ctrl, bool georef_ok);
     void writeCourse(const Course& course, const CourseDatabase& db);
     void writePosition(const LatLon& latlon);
 
     QXmlStreamWriter* xml = nullptr;
+    QHash<QString, QString> export_ids;  ///< CourseControl::id -> exported Id
 };
 
 

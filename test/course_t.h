@@ -31,6 +31,7 @@ namespace OpenOrienteering {
  *  - Unique id generation
  *  - Database change signals
  *  - Course name placeholders in map texts
+ *  - IOF export control ids
  */
 class CourseTest : public QObject
 {
@@ -49,6 +50,8 @@ private slots:
     void courseTextSubstitution();
 
     void competraCornersInPng();
+
+    void iofExportIds();
 };
 
 
