@@ -218,6 +218,19 @@ QString CompetraExportDialog::cornersText(const Georeferencing& georef, const QR
 
 
 // static
+void CompetraExportDialog::embedCorners(QImage& image, const QString& corners_text)
+{
+	const auto lines = corners_text.split(QLatin1Char('\n'), QString::SkipEmptyParts);
+	for (const auto& line : lines)
+	{
+		const auto separator = line.indexOf(QLatin1Char('='));
+		if (separator > 0)
+			image.setText(line.left(separator), line.mid(separator + 1));
+	}
+}
+
+
+// static
 void CompetraExportDialog::showCorners(QWidget* parent, const QString& message,
                                        const QString& corners_text, const QString& folder)
 {
@@ -369,9 +382,9 @@ void CompetraExportDialog::accept()
 	const auto folder = QDir::fromNativeSeparators(folder_edit->text());
 	showCorners(parentWidget(),
 	            tr("%n image(s) saved to %1.\n"
-	               "The WGS84 corner coordinates are the same for all images and have been copied to the clipboard. "
-	               "On the Competra website, attach each image to its distance and press \"Paste from Mapper\" "
-	               "(or paste the text into the coordinates field).", nullptr, num_saved)
+	               "On the Competra website, attach each image to its distance: the corner coordinates are "
+	               "filled in from the image. They are the same for all images and have also been copied "
+	               "to the clipboard for \"Paste from Mapper\".", nullptr, num_saved)
 	            .arg(QDir::toNativeSeparators(folder)),
 	            cornersText(map.getGeoreferencing(), exportArea()),
 	            folder);
@@ -397,6 +410,7 @@ int CompetraExportDialog::exportImages()
 	printer.setCourseOverlay(&overlay);
 
 	const auto size = imageSize();
+	const auto corners_text = cornersText(map.getGeoreferencing(), printer.getPrintArea());
 	const auto dots_per_meter = qRound(resolution_edit->value() / 0.0254);
 
 	QProgressDialog progress(tr("Exporting course maps..."), tr("Cancel"), 0, int(courses.size()), this);
@@ -429,6 +443,7 @@ int CompetraExportDialog::exportImages()
 		printer.drawPage(&painter, printer.getPrintArea(), &image);
 		painter.end();
 
+		embedCorners(image, corners_text);
 		const auto path = imagePath(course.name);
 		if (!image.save(path))
 		{

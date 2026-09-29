@@ -869,14 +869,14 @@ Continue?</source>
     <message numerus="yes">
         <location filename="../src/gui/course/competra_export_dialog.cpp" line="371"/>
         <source>%n image(s) saved to %1.
-The WGS84 corner coordinates are the same for all images and have been copied to the clipboard. On the Competra website, attach each image to its distance and press &quot;Paste from Mapper&quot; (or paste the text into the coordinates field).</source>
+On the Competra website, attach each image to its distance: the corner coordinates are filled in from the image. They are the same for all images and have also been copied to the clipboard for &quot;Paste from Mapper&quot;.</source>
         <translation>
             <numerusform>%n изображение сохранено в %1.
-Координаты углов WGS84 одинаковы для всех изображений и скопированы в буфер обмена. На сайте Competra прикрепите каждое изображение к своей дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</numerusform>
+На сайте Competra прикрепите каждое изображение к своей дистанции — координаты углов подставятся из изображения. Они одинаковы для всех изображений и также скопированы в буфер обмена для «Вставить из mapper».</numerusform>
             <numerusform>%n изображения сохранены в %1.
-Координаты углов WGS84 одинаковы для всех изображений и скопированы в буфер обмена. На сайте Competra прикрепите каждое изображение к своей дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</numerusform>
+На сайте Competra прикрепите каждое изображение к своей дистанции — координаты углов подставятся из изображения. Они одинаковы для всех изображений и также скопированы в буфер обмена для «Вставить из mapper».</numerusform>
             <numerusform>%n изображений сохранено в %1.
-Координаты углов WGS84 одинаковы для всех изображений и скопированы в буфер обмена. На сайте Competra прикрепите каждое изображение к своей дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</numerusform>
+На сайте Competra прикрепите каждое изображение к своей дистанции — координаты углов подставятся из изображения. Они одинаковы для всех изображений и также скопированы в буфер обмена для «Вставить из mapper».</numerusform>
         </translation>
     </message>
     <message>
@@ -7109,9 +7109,9 @@ separations</source>
     <message>
         <location filename="../src/gui/print_widget.cpp" line="1384"/>
         <source>The WGS84 corner coordinates of the exported image have been copied to the clipboard.
-On the Competra website, open the distance map form and press &quot;Paste from Mapper&quot; (or paste the text into the coordinates field).</source>
+On the Competra website, open the distance map form and press &quot;Paste from Mapper&quot; (or paste the text into the coordinates field). A PNG image also carries the coordinates, so they are filled in when you attach it.</source>
         <translation>Координаты углов WGS84 экспортированного изображения скопированы в буфер обмена.
-На сайте Competra откройте форму карты дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</translation>
+На сайте Competra откройте форму карты дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат). Изображение PNG также содержит координаты, поэтому при его прикреплении они подставятся сами.</translation>
     </message>
 </context>
 <context>

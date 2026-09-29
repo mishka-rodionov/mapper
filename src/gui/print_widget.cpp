@@ -1353,6 +1353,10 @@ void PrintWidget::exportToImage()
 	QPainter p(&image);
 	map_printer->drawPage(&p, map_printer->getPrintArea(), &image);
 	p.end();
+	if (competra_bounds_check->isChecked() && map->getGeoreferencing().getState() == Georeferencing::Geospatial)
+	{
+		CompetraExportDialog::embedCorners(image, CompetraExportDialog::cornersText(map->getGeoreferencing(), map_printer->getPrintArea()));
+	}
 	if (!image.save(path))
 	{
 		QMessageBox::warning(this, tr("Error"), tr("Failed to save the image. Does the path exist? Do you have sufficient rights?"));
@@ -1383,7 +1387,8 @@ void PrintWidget::showCompetraBounds() const
 	    const_cast<PrintWidget*>(this),
 	    tr("The WGS84 corner coordinates of the exported image have been copied to the clipboard.\n"
 	       "On the Competra website, open the distance map form and press "
-	       "\"Paste from Mapper\" (or paste the text into the coordinates field)."),
+	       "\"Paste from Mapper\" (or paste the text into the coordinates field). "
+	       "A PNG image also carries the coordinates, so they are filled in when you attach it."),
 	    CompetraExportDialog::cornersText(georef, map_printer->getPrintArea()));
 }
 

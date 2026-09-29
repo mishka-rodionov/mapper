@@ -21,7 +21,9 @@
 
 #include <QtTest>
 #include <QBuffer>
+#include <QByteArray>
 #include <QFile>
+#include <QImage>
 #include <QTemporaryDir>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
@@ -36,6 +38,7 @@
 #include "course/course_serialization.h"
 #include "course/course_text_substitution.h"
 #include "fileformats/xml_file_format_p.h"
+#include "gui/course/competra_export_dialog.h"
 
 
 namespace OpenOrienteering {
@@ -404,6 +407,40 @@ void CourseTest::courseTextSubstitution()
         const CourseTextSubstitution substitution{ map, QString() };
         QCOMPARE(title->getText(), QStringLiteral("Classes: {course}"));
     }
+}
+
+
+void CourseTest::competraCornersInPng()
+{
+#ifdef QT_PRINTSUPPORT_LIB
+    const auto corners_text = QStringLiteral(
+        "mapTopLeftLat=55.7512345\nmapTopLeftLng=37.6123456\n"
+        "mapTopRightLat=55.7523456\nmapTopRightLng=37.6345678\n"
+        "mapBottomRightLat=55.7401234\nmapBottomRightLng=-122.6356789");
+
+    QImage image(4, 4, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::white);
+    CompetraExportDialog::embedCorners(image, corners_text);
+
+    QByteArray png;
+    {
+        QBuffer buffer(&png);
+        QVERIFY(buffer.open(QIODevice::WriteOnly));
+        QVERIFY(image.save(&buffer, "PNG"));
+    }
+
+    // Competra's web client reads plain (uncompressed) tEXt chunks:
+    // "tEXt" + keyword + NUL + Latin-1 value.
+    QVERIFY(png.contains(QByteArray("tEXtmapTopLeftLat\0" "55.7512345", 28)));
+    QVERIFY(png.contains(QByteArray("tEXtmapBottomRightLng\0" "-122.6356789", 34)));
+
+    QImage loaded;
+    QVERIFY(loaded.loadFromData(png, "PNG"));
+    QCOMPARE(loaded.text(QStringLiteral("mapTopRightLat")), QStringLiteral("55.7523456"));
+    QCOMPARE(loaded.text(QStringLiteral("mapTopRightLng")), QStringLiteral("37.6345678"));
+#else
+    QSKIP("Requires Qt Print Support");
+#endif
 }
 
 

@@ -28,6 +28,7 @@
 #include <QSizeF>
 #include <QString>
 
+class QImage;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -48,8 +49,10 @@ class MapView;
  * Exports one raster image per course for the Competra app.
  *
  * All images share the same map area, so a single set of WGS84 corner
- * coordinates (see cornersText()) georeferences every one of them. Texts on
- * the map may use the "{course}" placeholder to show each course's name.
+ * coordinates (see cornersText()) georeferences every one of them. The
+ * corners are also embedded in each image (see embedCorners()), so Competra
+ * can fill them in from the file alone. Texts on the map may use the
+ * "{course}" placeholder to show each course's name.
  */
 class CompetraExportDialog : public QDialog
 {
@@ -67,6 +70,15 @@ public:
 	 */
 	static QString cornersText(const Georeferencing& georef, const QRectF& area);
 
+	/**
+	 * Embeds the corners text in the image's text metadata, one entry per
+	 * "key=value" line (e.g. "mapTopLeftLat" -> "55.1234567").
+	 *
+	 * The values are short enough for Qt to write them as uncompressed PNG
+	 * tEXt chunks, which Competra reads when an image is chosen for upload.
+	 */
+	static void embedCorners(QImage& image, const QString& corners_text);
+	
 	/**
 	 * Copies the corners text to the clipboard and shows it with a Copy button.
 	 * If folder is not empty, the dialog also offers to open it.

@@ -47,6 +47,8 @@ private slots:
     void courseFileDetachAndReattach();
 
     void courseTextSubstitution();
+
+    void competraCornersInPng();
 };
 
 
