@@ -51,7 +51,8 @@ jobs:
           DIST="dist/Mapper"
           # Mapper.exe plus its data next to it (translations, symbol sets,
           # examples, licenses), where Mapper looks for them on Windows.
-          cmake --install build --prefix "$DIST"
+          # (The install scripts need an absolute Windows path.)
+          cmake --install build --prefix "$(cygpath -m "$PWD/$DIST")"
 
           # Qt plugins are not auto-collected (no windeployqt in MSYS2);
           # copy the ones Mapper needs to find a platform and load images/SQL.
