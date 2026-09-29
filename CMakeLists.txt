@@ -67,6 +67,8 @@ endif(NOT CMAKE_BUILD_TYPE)
 
 option(Mapper_DEBUG_TRANSLATIONS "Debug missing translations" OFF)
 
+option(Mapper_MANUAL "Build the user manual (requires doxygen)" ON)
+
 # To improve developer experience, build clipper if it is not found
 set(Mapper_BUILD_CLIPPER "auto" CACHE STRING
   "Build the Clipper package from source, alternatives: ON, OFF"
@@ -283,7 +285,9 @@ endif()
 
 # Subdirectories
 
-add_subdirectory("doc/manual")
+if(Mapper_MANUAL)
+	add_subdirectory("doc/manual")
+endif()
 add_subdirectory("examples")
 add_subdirectory("symbol sets")
 add_subdirectory("translations")

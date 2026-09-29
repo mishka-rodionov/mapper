@@ -31,12 +31,12 @@ jobs:
             mingw-w64-x86_64-qt5
             mingw-w64-x86_64-proj
             mingw-w64-x86_64-gdal
-            mingw-w64-x86_64-doxygen
 
       - name: Configure
         run: |
           cmake -G Ninja -S "${GITHUB_WORKSPACE}" -B build \
             -DCMAKE_BUILD_TYPE=Release \
+            -DMapper_MANUAL=OFF \
             -DMapper_PACKAGE_ASSISTANT=OFF \
             -DMapper_PACKAGE_QT=OFF \
             -DMapper_PACKAGE_PROJ=OFF \
@@ -49,8 +49,9 @@ jobs:
         run: |
           set -e
           DIST="dist/Mapper"
-          mkdir -p "$DIST"
-          cp build/src/Mapper.exe "$DIST/"
+          # Mapper.exe plus its data next to it (translations, symbol sets,
+          # examples, licenses), where Mapper looks for them on Windows.
+          cmake --install build --prefix "$DIST"
 
           # Qt plugins are not auto-collected (no windeployqt in MSYS2);
           # copy the ones Mapper needs to find a platform and load images/SQL.
@@ -80,10 +81,14 @@ jobs:
             done
           done
 
-          # PROJ and GDAL need their data directories at runtime.
-          mkdir -p "$DIST/share"
-          cp -r /mingw64/share/proj "$DIST/share/" 2>/dev/null || true
-          cp -r /mingw64/share/gdal "$DIST/share/" 2>/dev/null || true
+          # PROJ and GDAL data: Mapper looks for them in "proj" and "gdal"
+          # next to the executable (data:/proj, data:/gdal).
+          mkdir -p "$DIST/proj" "$DIST/gdal"
+          cp -r /mingw64/share/proj/. "$DIST/proj/"
+          cp -r /mingw64/share/gdal/. "$DIST/gdal/"
+          test -f "$DIST/proj/proj.db"
+          test -f "$DIST/Mapper.exe"
+          test -f "$DIST/translations/OpenOrienteering_ru.qm"
 
           cd dist && zip -r "../Mapper-windows-x64.zip" Mapper
 
