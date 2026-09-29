@@ -10068,6 +10068,16 @@ Continue?</source>
         <source>Save one map image per course and copy the corner coordinates needed to attach the images to the distances in Competra.</source>
         <translation>Сохранить изображение карты для каждой дистанции и скопировать координаты углов, нужные для привязки изображений к дистанциям в Competra.</translation>
     </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="363"/>
+        <source>Legend columns:</source>
+        <translation>Столбцы легенды:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="367"/>
+        <source>Split the control description table into this many side-by-side blocks (useful for courses with many controls)</source>
+        <translation>Разделить таблицу легенды КП на столько блоков, стоящих рядом (удобно для дистанций с большим количеством КП)</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::CourseFeature</name>
