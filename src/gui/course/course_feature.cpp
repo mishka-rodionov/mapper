@@ -31,6 +31,7 @@
 #include "course/course_overlay.h"
 #include "fileformats/file_format_registry.h"
 #include "fileformats/file_import_export.h"
+#include "gui/course/competra_export_dialog.h"
 #include "gui/course/course_panel.h"
 #include "gui/course/iscd_symbol_browser.h"
 #include "gui/map/map_editor.h"
@@ -77,6 +78,12 @@ CourseFeature::CourseFeature(MapEditorController& controller)
     connect(export_iof_act, &QAction::triggered,
             this, &CourseFeature::exportIofFull);
 
+    // "Export course maps for Competra" action
+    export_competra_maps_act = new QAction(tr("Export course &maps for Competra…"), this);
+    export_competra_maps_act->setMenuRole(QAction::NoRole);
+    connect(export_competra_maps_act, &QAction::triggered,
+            this, &CourseFeature::exportCompetraMaps);
+
     // "Symbol Reference" browser (development aid)
     symbol_browser_act = new QAction(tr("ISCD Symbol &Reference…"), this);
     symbol_browser_act->setMenuRole(QAction::NoRole);
@@ -97,6 +104,7 @@ void CourseFeature::setEnabled(bool enabled)
     show_panel_act->setEnabled(enabled);
     place_control_act->setEnabled(enabled);
     export_iof_act->setEnabled(enabled);
+    export_competra_maps_act->setEnabled(enabled);
 }
 
 
@@ -208,6 +216,31 @@ void CourseFeature::exportIofFull()
 }
 
 
+void CourseFeature::exportCompetraMaps()
+{
+#ifdef QT_PRINTSUPPORT_LIB
+    if (controller.isEditingInProgress())
+    {
+        QMessageBox::warning(controller.getWindow(),
+                             tr("Editing in progress"),
+                             tr("The map is currently being edited. "
+                                "Please finish the edit operation first."));
+        return;
+    }
+
+    CompetraExportDialog dialog(*controller.getMap(),
+                                controller.getMainWidget()->getMapView(),
+                                *course_overlay,
+                                controller.getWindow()->currentPath(),
+                                controller.getWindow());
+    dialog.exec();
+#else
+    QMessageBox::warning(controller.getWindow(), tr("Error"),
+                         tr("Print / Export is not available in this program version!"));
+#endif
+}
+
+
 void CourseFeature::openSymbolBrowser()
 {
     auto* dlg = new ISCDSymbolBrowser(controller.getWindow());
@@ -234,6 +267,8 @@ void CourseFeature::createDockWidget()
             });
     connect(panel, &CoursePanelWidget::nextControlTypeChangeRequested,
             this, &CourseFeature::onNextControlTypeChangeRequested);
+    connect(panel, &CoursePanelWidget::exportCompetraMapsRequested,
+            export_competra_maps_act, &QAction::trigger);
 
     auto* main_window = controller.getWindow();
     dock_widget = new EditorDockWidget(tr("Course Planning"),

@@ -28,10 +28,13 @@
 
 #include "core/map.h"
 #include "core/map_coord.h"
+#include "core/objects/text_object.h"
+#include "core/symbols/text_symbol.h"
 #include "course/course.h"
 #include "course/course_control.h"
 #include "course/course_database.h"
 #include "course/course_serialization.h"
+#include "course/course_text_substitution.h"
 #include "fileformats/xml_file_format_p.h"
 
 
@@ -373,6 +376,33 @@ void CourseTest::courseFileDetachAndReattach()
         QFile new_file{ dir.filePath(second_file) };
         QVERIFY(new_file.open(QIODevice::ReadOnly));
         QVERIFY(new_file.readAll().contains("102"));
+    }
+}
+
+
+void CourseTest::courseTextSubstitution()
+{
+    Map map;
+    auto* title = new TextObject(Map::getUndefinedText());
+    title->setText(QStringLiteral("Classes: {course}"));
+    map.addObject(title);
+    auto* other = new TextObject(Map::getUndefinedText());
+    other->setText(QStringLiteral("Spring Cup"));
+    map.addObject(other);
+    map.setHasUnsavedChanges(false);
+
+    {
+        const CourseTextSubstitution substitution{ map, QStringLiteral("M21, W35") };
+        QCOMPARE(title->getText(), QStringLiteral("Classes: M21, W35"));
+        QCOMPARE(other->getText(), QStringLiteral("Spring Cup"));
+    }
+    QCOMPARE(title->getText(), QStringLiteral("Classes: {course}"));
+    QVERIFY(!map.hasUnsavedChanges());
+
+    // No visible course: the placeholder stays as is.
+    {
+        const CourseTextSubstitution substitution{ map, QString() };
+        QCOMPARE(title->getText(), QStringLiteral("Classes: {course}"));
     }
 }
 

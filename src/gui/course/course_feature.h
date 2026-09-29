@@ -74,6 +74,9 @@ public:
     /** Action to export all courses as IOF 3.0 XML (full course database). */
     QAction* exportIofFullAction() { return export_iof_act; }
 
+    /** Action to export one image per course, plus corner coordinates, for Competra. */
+    QAction* exportCompetraMapsAction() { return export_competra_maps_act; }
+
     /** Action to open the ISCD symbol reference browser (development aid). */
     QAction* symbolBrowserAction() { return symbol_browser_act; }
 
@@ -84,6 +87,7 @@ private slots:
     void showPanelToggled(bool show);
     void activatePlaceControlTool();
     void exportIofFull();
+    void exportCompetraMaps();
     void openSymbolBrowser();
     void onControlSelectedInTool(const QString& control_id);
     void onNextControlTypeChangeRequested(ControlType type);
@@ -111,6 +115,7 @@ private:
     QAction* show_panel_act      = nullptr;
     QAction* place_control_act   = nullptr;
     QAction* export_iof_act      = nullptr;
+    QAction* export_competra_maps_act = nullptr;
     QAction* symbol_browser_act  = nullptr;
 };
 

@@ -80,6 +80,9 @@ signals:
     /** Emitted when the user clicks a type button; CourseFeature forwards to the tool. */
     void nextControlTypeChangeRequested(ControlType type);
 
+    /** Emitted when the user asks to export the course maps for Competra. */
+    void exportCompetraMapsRequested();
+
 private slots:
     // Database change reactions
     void rebuildControlsTree();

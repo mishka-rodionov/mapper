@@ -405,6 +405,15 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         layout->addWidget(entries_list, 3);
         layout->addLayout(entry_btns);
         layout->addLayout(entry_points_row);
+
+        auto* export_competra_btn = new QPushButton(tr("Export course maps for Competra…"));
+        export_competra_btn->setToolTip(
+            tr("Save one map image per course and copy the corner coordinates "
+               "needed to attach the images to the distances in Competra."));
+        connect(export_competra_btn, &QPushButton::clicked,
+                this, &CoursePanelWidget::exportCompetraMapsRequested);
+        layout->addWidget(export_competra_btn);
+
         layout->setContentsMargins(4, 4, 4, 4);
         auto* tab = new QWidget;
         tab->setLayout(layout);

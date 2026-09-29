@@ -30,6 +30,7 @@ namespace OpenOrienteering {
  *  - CourseDatabase XML round-trip
  *  - Unique id generation
  *  - Database change signals
+ *  - Course name placeholders in map texts
  */
 class CourseTest : public QObject
 {
@@ -44,6 +45,8 @@ private slots:
 
     void sidecarFile();
     void courseFileDetachAndReattach();
+
+    void courseTextSubstitution();
 };
 
 

@@ -60,7 +60,9 @@
 #include "core/map_grid.h"
 #include "core/map_view.h"
 #include "core/renderables/renderable.h"
+#include "course/course.h"
 #include "course/course_overlay.h"
+#include "course/course_text_substitution.h"
 #include "templates/template.h"
 #include "util/xml_stream_util.h"
 
@@ -975,6 +977,10 @@ void MapPrinter::drawPage(QPainter* device_painter, const QRectF& page_extent, c
 	                          | QPainter::SmoothPixmapTransform;
 	
 	const auto page_region_used = page_extent.intersected(print_area);
+	
+	// Texts like "Classes: {course}" show the name of the course being printed.
+	const auto* course = course_overlay ? course_overlay->visibleCourse() : nullptr;
+	const CourseTextSubstitution course_texts(map, course ? course->name : QString());
 	
 	
 	/*

@@ -672,6 +672,247 @@
     </message>
 </context>
 <context>
+    <name>OpenOrienteering::CompetraExportDialog</name>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="102"/>
+        <source>Export course maps for Competra</source>
+        <translation>Экспорт карт дистанций для Competra</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="110"/>
+        <source>One image is saved per course. All images cover the same map area, so a single set of corner coordinates attaches each of them in Competra.
+Tip: write %1 in a text on the map (e.g. &quot;Classes: %1&quot;) to print the name of each course there.</source>
+        <translation>Для каждой дистанции сохраняется отдельное изображение. Все изображения охватывают одну и ту же область карты, поэтому в Competra все они привязываются по одному набору координат углов.
+Совет: напишите %1 в тексте на карте (например, «Группы: %1»), и там будет выведено название каждой дистанции.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="126"/>
+        <source>Print area (as set up in File &gt; Print)</source>
+        <translation>Область печати (как настроено в «Файл &gt; Печать»)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="127"/>
+        <source>Whole map</source>
+        <translation>Вся карта</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="149"/>
+        <source>Choose...</source>
+        <translation>Выбрать…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="166"/>
+        <source>Courses:</source>
+        <translation>Дистанции:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="167"/>
+        <source>Map area:</source>
+        <translation>Область карты:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="168"/>
+        <source>Resolution:</source>
+        <translation>Разрешение:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="169"/>
+        <source>Folder:</source>
+        <translation>Папка:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="78"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="79"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="95"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="102"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="173"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="182"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="183"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="184"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="185"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="186"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="187"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="188"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="194"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="198"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="221"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="264"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="299"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="307"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="315"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="327"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="338"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="381"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="402"/>
+        <source>Export</source>
+        <translation>Экспортировать</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="229"/>
+        <source>Competra map bounds</source>
+        <translation>Границы карты для Competra</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="246"/>
+        <source>Open folder</source>
+        <translation>Открыть папку</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="2"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="225"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="251"/>
+        <source>Copy</source>
+        <translation>Копировать</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="224"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="255"/>
+        <source>Copied</source>
+        <translation>Скопировано</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="267"/>
+        <source>Image size: %1 x %2 px</source>
+        <translation>Размер изображения: %1 x %2 пикс.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="280"/>
+        <source>File names: %1, ...</source>
+        <translation>Имена файлов: %1, …</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="284"/>
+        <source>The map must be georeferenced (Map &gt; Georeferencing) to attach the images in Competra.</source>
+        <translation>Чтобы привязать изображения в Competra, у карты должна быть геопривязка («Карта &gt; Геопривязка»).</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="286"/>
+        <source>There are no courses. Create courses in the Course Planning panel first.</source>
+        <translation>Нет дистанций. Сначала создайте дистанции в панели планирования дистанций.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="288"/>
+        <source>Select at least one course.</source>
+        <translation>Выберите хотя бы одну дистанцию.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="290"/>
+        <source>The map area to export is empty.</source>
+        <translation>Область карты для экспорта пуста.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="292"/>
+        <source>The folder does not exist.</source>
+        <translation>Папка не существует.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="301"/>
+        <source>Choose folder</source>
+        <translation>Выбор папки</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="68"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="69"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="70"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="71"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="102"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="104"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="110"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="112"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="113"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="116"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="119"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="166"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="182"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="269"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="271"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="273"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="276"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="280"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="285"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="286"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="288"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="327"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="329"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="331"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="341"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="343"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="345"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="383"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="384"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="385"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="387"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="388"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="402"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="406"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="407"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="409"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="415"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="416"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="432"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="442"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="443"/>
+        <source>course</source>
+        <translation>дистанция</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="352"/>
+        <source>These files already exist and will be replaced:
+%1
+
+Continue?</source>
+        <translation>Эти файлы уже существуют и будут заменены:
+%1
+
+Продолжить?</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="371"/>
+        <source>%n image(s) saved to %1.
+The WGS84 corner coordinates are the same for all images and have been copied to the clipboard. On the Competra website, attach each image to its distance and press &quot;Paste from Mapper&quot; (or paste the text into the coordinates field).</source>
+        <translation>
+            <numerusform>%n изображение сохранено в %1.
+Координаты углов WGS84 одинаковы для всех изображений и скопированы в буфер обмена. На сайте Competra прикрепите каждое изображение к своей дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</numerusform>
+            <numerusform>%n изображения сохранены в %1.
+Координаты углов WGS84 одинаковы для всех изображений и скопированы в буфер обмена. На сайте Competra прикрепите каждое изображение к своей дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</numerusform>
+            <numerusform>%n изображений сохранено в %1.
+Координаты углов WGS84 одинаковы для всех изображений и скопированы в буфер обмена. На сайте Competra прикрепите каждое изображение к своей дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="402"/>
+        <source>Exporting course maps...</source>
+        <translation>Экспорт карт дистанций…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="172"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="402"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="412"/>
+        <source>Cancel</source>
+        <translation>Отмена</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="421"/>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="435"/>
+        <source>Error</source>
+        <translation>Ошибка</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="421"/>
+        <source>Failed to prepare the image. Not enough memory.</source>
+        <translation>Не удалось подготовить изображение. Недостаточно памяти.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/competra_export_dialog.cpp" line="436"/>
+        <source>Failed to save the image:
+%1
+Does the path exist? Do you have sufficient rights?</source>
+        <translation>Не удалось сохранить изображение:
+%1
+Существует ли путь? У вас достаточно прав?</translation>
+    </message>
+</context>
+<context>
     <name>OpenOrienteering::ConfigureGridDialog</name>
     <message>
         <location filename="../src/gui/configure_grid_dialog.cpp" line="67"/>
@@ -6855,6 +7096,23 @@ separations</source>
         <source>The map area is empty. Output canceled.</source>
         <translation>Область карты пуста. Вывод отменен.</translation>
     </message>
+    <message>
+        <location filename="../src/gui/print_widget.cpp" line="310"/>
+        <source>Copy WGS84 map corners for Competra</source>
+        <translation>Скопировать углы карты WGS84 для Competra</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/print_widget.cpp" line="692"/>
+        <source>The map must be georeferenced (Map &gt; Georeferencing) for this.</source>
+        <translation>Для этого у карты должна быть геопривязка («Карта &gt; Геопривязка»).</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/print_widget.cpp" line="1384"/>
+        <source>The WGS84 corner coordinates of the exported image have been copied to the clipboard.
+On the Competra website, open the distance map form and press &quot;Paste from Mapper&quot; (or paste the text into the coordinates field).</source>
+        <translation>Координаты углов WGS84 экспортированного изображения скопированы в буфер обмена.
+На сайте Competra откройте форму карты дистанции и нажмите «Вставить из mapper» (или вставьте текст в поле координат).</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::ReopenTemplateDialog</name>
@@ -9800,6 +10058,16 @@ Continue?</source>
         <source>%1 pts</source>
         <translation>%1 б.</translation>
     </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="409"/>
+        <source>Export course maps for Competra…</source>
+        <translation>Экспорт карт дистанций для Competra…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="411"/>
+        <source>Save one map image per course and copy the corner coordinates needed to attach the images to the distances in Competra.</source>
+        <translation>Сохранить изображение карты для каждой дистанции и скопировать координаты углов, нужные для привязки изображений к дистанциям в Competra.</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::CourseFeature</name>
@@ -9855,6 +10123,31 @@ Continue?</source>
         <location filename="../src/gui/course/course_feature.cpp" line="81"/>
         <source>ISCD Symbol &amp;Reference…</source>
         <translation>Справочник символов &amp;ISCD…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="82"/>
+        <source>Export course &amp;maps for Competra…</source>
+        <translation>Экспорт карт дистанций для &amp;Competra…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="225"/>
+        <source>Editing in progress</source>
+        <translation>Редактирование в процессе</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="226"/>
+        <source>The map is currently being edited. Please finish the edit operation first.</source>
+        <translation>Карта в настоящее время редактируется. Пожалуйста, сначала закончите операцию редактирования.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="238"/>
+        <source>Error</source>
+        <translation>Ошибка</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="239"/>
+        <source>Print / Export is not available in this program version!</source>
+        <translation>Печать / Экспорт недоступны в данной версии программы!</translation>
     </message>
 </context>
 <context>

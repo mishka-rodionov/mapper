@@ -94,6 +94,7 @@ set(Mapper_Common_SRCS
   course/course_database.cpp
   course/course_overlay.cpp
   course/course_serialization.cpp
+  course/course_text_substitution.cpp
   course/course_undo.cpp
   course/iscd_symbol_library.cpp
 
@@ -178,6 +179,7 @@ set(Mapper_Common_SRCS
   gui/map/map_dialog_scale.cpp
   gui/map/map_editor.cpp
   gui/map/map_editor_activity.cpp
+  gui/course/competra_export_dialog.cpp
   gui/course/control_properties_widget.cpp
   gui/course/course_feature.cpp
   gui/course/course_panel.cpp
