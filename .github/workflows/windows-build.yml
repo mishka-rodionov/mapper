@@ -82,6 +82,23 @@ jobs:
             done
           done
 
+          # Qt's own translations (standard dialogs and buttons), loaded as
+          # translations/qt_<lang>.qm for every language Mapper ships.
+          # Keep the qt_*.qm files which Mapper provides itself.
+          QT_TRANSLATIONS="/mingw64/share/qt5/translations"
+          for f in "$DIST"/translations/OpenOrienteering_*.qm; do
+            lang=$(basename "$f" .qm)
+            lang=${lang#OpenOrienteering_}
+            target="$DIST/translations/qt_$lang.qm"
+            [ -e "$target" ] && continue
+            for source in "$QT_TRANSLATIONS/qtbase_$lang.qm" "$QT_TRANSLATIONS/qtbase_${lang%%_*}.qm"; do
+              if [ -f "$source" ]; then
+                cp "$source" "$target"
+                break
+              fi
+            done
+          done
+
           # PROJ and GDAL data: Mapper looks for them in "proj" and "gdal"
           # next to the executable (data:/proj, data:/gdal).
           mkdir -p "$DIST/proj" "$DIST/gdal"
@@ -90,6 +107,7 @@ jobs:
           test -f "$DIST/proj/proj.db"
           test -f "$DIST/Mapper.exe"
           test -f "$DIST/translations/OpenOrienteering_ru.qm"
+          test -f "$DIST/translations/qt_ru.qm"
 
           cd dist && zip -r "../Mapper-windows-x64.zip" Mapper
 
