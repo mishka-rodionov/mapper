@@ -257,7 +257,7 @@ private:
                             const QString& header_name, const QString& header_info,
                             bool show_header_text,
                             const CourseControl* start_ctrl, const CourseControl* finish_ctrl,
-                            const PaintContext& context) const;
+                            const QString& finish_distance, const PaintContext& context) const;
 
     /** Draws the content of one ISCD cell.  column is 0-based (0=A … 7=H). */
     void paintISCDCell(QPainter* painter, const QString& text,
@@ -266,11 +266,25 @@ private:
     /** Draws a miniature start triangle filling the given cell. */
     void paintStartCell(QPainter* painter, const QRectF& cell) const;
 
-    /** Draws miniature finish concentric circles filling the given cell. */
-    void paintFinishCell(QPainter* painter, const QRectF& cell) const;
+    /**
+     * Draws the full-width finish row (IOF symbol 14.1): the last control's
+     * circle, a dashed line interrupted by the distance text (may be empty),
+     * and the finish's concentric circles.
+     */
+    void paintFinishRow(QPainter* painter, const QRectF& row, qreal cell,
+                        const QString& distance) const;
 
     /** Returns the total course distance in meters (0 if < 2 resolved controls). */
     qreal computeCourseDistanceM(const Course& course) const;
+
+    /**
+     * Returns the distance in meters from the last control to the finish,
+     * along the course (through crossing points), or 0 if there is none.
+     */
+    qreal computeFinishDistanceM(const Course& course) const;
+
+    /** Returns the length in meters of the straight legs through the given controls. */
+    qreal pathDistanceM(const QVector<const CourseControl*>& path) const;
 
     // --- Coordinate conversion ---
     /** Converts a MapCoord (1/1000 mm) to viewport pixel coordinates. */

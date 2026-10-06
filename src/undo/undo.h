@@ -77,7 +77,8 @@ public:
 		CoursesChangedType           = 104,
 		CourseControlNumberMovedType = 105,
 		CourseDatabaseReplacedType   = 106,
-		CourseControlCircleBreaksType = 107
+		CourseControlCircleBreaksType = 107,
+		CourseColorChangedType       = 108
 	};
 	
 	/**

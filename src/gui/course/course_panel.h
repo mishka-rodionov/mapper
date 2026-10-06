@@ -30,6 +30,7 @@
 
 class QAction;
 class QButtonGroup;
+class QColor;
 class QComboBox;
 class QLabel;
 class QListWidget;
@@ -54,17 +55,33 @@ class MainWindow;
 /**
  * Dock widget content for the Course Planning panel.
  *
- * Contains two tabs:
- *  - Controls: flat list of all controls in the database
- *  - Courses:  list of courses + entry list for the selected course
+ * The single place for all course planning work, arranged in blocks:
+ *  - Course file: import, recent files, clearing the map
+ *  - Placing controls: the Place Control tool and the type of the next control
+ *  - Tabs: Controls (flat list of all controls) and Courses (list of courses
+ *    + entry list for the selected course)
+ *  - Export: IOF XML and course maps for Competra
  */
 class CoursePanelWidget : public QWidget
 {
     Q_OBJECT
 
 public:
+    /**
+     * Actions owned by CourseFeature which the panel shows as buttons.
+     * The buttons follow the actions' checked and enabled states.
+     */
+    struct Actions
+    {
+        QAction* place_control;
+        QAction* export_iof;
+        QAction* export_competra_maps;
+        QAction* symbol_reference;
+    };
+
     CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay* overlay,
-                      MainWindow* main_window, QWidget* parent = nullptr);
+                      MainWindow* main_window, const Actions& actions,
+                      QWidget* parent = nullptr);
     ~CoursePanelWidget() override = default;
 
     /** Highlights the given control (e.g. after PlaceControlTool selects it). */
@@ -79,9 +96,6 @@ signals:
 
     /** Emitted when the user clicks a type button; CourseFeature forwards to the tool. */
     void nextControlTypeChangeRequested(ControlType type);
-
-    /** Emitted when the user asks to export the course maps for Competra. */
-    void exportCompetraMapsRequested();
 
 private slots:
     // Database change reactions
@@ -105,6 +119,9 @@ private slots:
     void onCourseTargetComboChanged(int index);
 
     // Courses tab actions
+    void chooseCourseColor();
+    void resetCourseColor();
+    void updateCourseColorButtons();
     void addCourse();
     void renameCourse();
     void removeCourse();
@@ -114,6 +131,10 @@ private slots:
 
     // Entries tab actions
     void addSelectedControlToCourse();
+    void addPickedControlsToCourse();
+    void rebuildControlPicker();
+    void onPickerSelectionModelChanged(const QItemSelection& selected, const QItemSelection& deselected);
+    void updateAddEntryButton();
     void onClimbValueChanged(int value);
     void onLegendScaleValueChanged(int value);
     void onLegendScaleChangeRequested(double scale, bool commit);
@@ -139,11 +160,17 @@ private:
      */
     void loadCourseFileOntoMap(const QString& absolute_path, const QString& relative_name);
 
+    /** Appends the given controls to the selected course, as one undo step. */
+    void addControlsToCourse(const std::vector<QString>& control_ids);
+
     /** Pushes CoursesChangedUndoStep then commits the new courses. */
     void commitCoursesChange(std::vector<Course> before_snapshot,
                              std::vector<Course> new_courses);
 
     int selectedCourseIndex() const;
+
+    /** Sets the color of all courses, as an undo step. */
+    void setCourseColor(const QColor& color);
 
     Map&             map;
     CourseDatabase&  db;
@@ -170,16 +197,19 @@ private:
     ControlPropertiesWidget*  properties_widget = nullptr;
 
     // Courses tab
+    QToolButton*  course_color_btn       = nullptr;
+    QToolButton*  reset_course_color_btn = nullptr;
     QListWidget*  courses_list    = nullptr;
     QPushButton*  add_course_btn  = nullptr;
     QPushButton*  rename_btn      = nullptr;
     QPushButton*  remove_course_btn = nullptr;
 
+    QTreeWidget*  picker_tree     = nullptr;  ///< All controls on the map, to add to the course
     QListWidget*  entries_list    = nullptr;
     QPushButton*  add_entry_btn   = nullptr;
     QPushButton*  remove_entry_btn = nullptr;
-    QPushButton*  entry_up_btn    = nullptr;
-    QPushButton*  entry_down_btn  = nullptr;
+    QToolButton*  entry_up_btn    = nullptr;
+    QToolButton*  entry_down_btn  = nullptr;
     QLabel*       entry_points_label   = nullptr;
     QSpinBox*     entry_points_spinbox = nullptr;
 
@@ -198,6 +228,7 @@ private:
 
     QString selected_control_id;  ///< Currently highlighted control
     std::vector<QString> selected_control_order;  ///< Multi-selection, in click order
+    std::vector<QString> picked_control_order;    ///< Picker multi-selection, in click order
     bool rebuilding = false;       ///< Guard against recursive rebuild
 };
 

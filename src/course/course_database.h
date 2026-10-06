@@ -22,6 +22,7 @@
 
 #include <vector>
 
+#include <QColor>
 #include <QObject>
 #include <QString>
 #include <QStringList>
@@ -59,6 +60,20 @@ public:
 
     const QString& eventName() const { return event_name; }
     void setEventName(const QString& name);
+
+
+    // --- Appearance ---
+
+    /** The IOF course purple, per ISOM 2017-2 / ISSprOM 2019. */
+    static QColor defaultCourseColor() { return { 148, 0, 211 }; }
+
+    /**
+     * The color in which controls, start, finish and legs of all courses
+     * are drawn on the map (e.g. a stronger color for printers which
+     * render the purple too pale).
+     */
+    const QColor& courseColor() const { return course_color; }
+    void setCourseColor(const QColor& color);
 
 
     // --- Controls ---
@@ -159,6 +174,7 @@ public:
 
 signals:
     void eventNameChanged();
+    void courseColorChanged();
     void controlAdded(int index);
     void controlChanged(int index);
     void controlRemoved(int index);
@@ -169,6 +185,7 @@ signals:
 
 private:
     QString event_name;
+    QColor course_color = defaultCourseColor();
     std::vector<CourseControl> controls;
     std::vector<Course> courses;
     std::vector<MapCoordF> legend_block_anchors;

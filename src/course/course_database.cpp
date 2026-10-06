@@ -37,6 +37,7 @@ CourseDatabase::~CourseDatabase() = default;
 bool CourseDatabase::operator==(const CourseDatabase& other) const
 {
     return event_name == other.event_name
+        && course_color == other.course_color
         && controls   == other.controls
         && courses    == other.courses;
 }
@@ -48,6 +49,16 @@ void CourseDatabase::setEventName(const QString& name)
     {
         event_name = name;
         emit eventNameChanged();
+    }
+}
+
+
+void CourseDatabase::setCourseColor(const QColor& color)
+{
+    if (course_color != color)
+    {
+        course_color = color;
+        emit courseColorChanged();
     }
 }
 

@@ -47,6 +47,7 @@ static const QLatin1String tag_entry         ("entry");
 
 static const QLatin1String attr_version      ("version");
 static const QLatin1String attr_event        ("event");
+static const QLatin1String attr_color        ("color");
 static const QLatin1String attr_id           ("id");
 static const QLatin1String attr_type         ("type");
 static const QLatin1String attr_x            ("x");
@@ -302,6 +303,8 @@ void save(QXmlStreamWriter& xml, const CourseDatabase& db)
     courses_elem.writeAttribute(attr_version, current_courses_version);
     if (!db.eventName().isEmpty())
         courses_elem.writeAttribute(attr_event, db.eventName());
+    if (db.courseColor() != CourseDatabase::defaultCourseColor())
+        courses_elem.writeAttribute(attr_color, db.courseColor().name());
     // Attribute names for blocks beyond the first are built dynamically, so these
     // go through the QXmlStreamWriter directly rather than the QLatin1String-only
     // XmlElementWriter::writeAttribute() overloads.
@@ -327,6 +330,8 @@ void load(QXmlStreamReader& xml, CourseDatabase& db)
     // Caller has positioned reader at the <courses> start element.
     const auto attrs = xml.attributes();
     db.setEventName(attrs.value(attr_event).toString());
+    const QColor color(attrs.value(attr_color).toString());
+    db.setCourseColor(color.isValid() ? color : CourseDatabase::defaultCourseColor());
 
     db.clearLegendAnchors();
     for (int i = 0; i < max_description_columns; ++i)

@@ -44,7 +44,7 @@ class PlaceControlTool;
  *
  * Follows the exact same pattern as MapFindFeature:
  *  - Constructor takes MapEditorController& and wires itself up
- *  - Exposes QAction* accessors for menu/toolbar integration
+ *  - Exposes the panel toggle action for menu integration
  *  - setEnabled() disables all actions during active editing operations
  *
  * Lifecycle (mirrors GPSDisplay / other sensors):
@@ -65,27 +65,20 @@ public:
     /** Enables or disables all course actions (called from setEditingInProgress). */
     void setEnabled(bool enabled);
 
-    /** Checkable action to show/hide the Course Planning dock. */
+    /**
+     * Checkable action to show/hide the Course Planning dock.
+     *
+     * This is the only action offered in the menu. Placing controls, export
+     * and the ISCD symbol reference are buttons in the panel itself.
+     */
     QAction* showPanelAction() { return show_panel_act; }
-
-    /** Tool action to activate PlaceControlTool. */
-    QAction* placeControlAction() { return place_control_act; }
-
-    /** Action to export all courses as IOF 3.0 XML (full course database). */
-    QAction* exportIofFullAction() { return export_iof_act; }
-
-    /** Action to export one image per course, plus corner coordinates, for Competra. */
-    QAction* exportCompetraMapsAction() { return export_competra_maps_act; }
-
-    /** Action to open the ISCD symbol reference browser (development aid). */
-    QAction* symbolBrowserAction() { return symbol_browser_act; }
 
     /** Returns the CourseOverlay owned by this feature. */
     CourseOverlay* overlay() const { return course_overlay.get(); }
 
 private slots:
     void showPanelToggled(bool show);
-    void activatePlaceControlTool();
+    void placeControlToggled(bool checked);
     void exportIofFull();
     void exportCompetraMaps();
     void openSymbolBrowser();

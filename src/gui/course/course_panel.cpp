@@ -25,10 +25,13 @@
 
 #include <QAction>
 #include <QButtonGroup>
+#include <QColorDialog>
 #include <QComboBox>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QIcon>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QItemSelection>
@@ -38,8 +41,11 @@
 #include <QMenu>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QPalette>
+#include <QPixmap>
 #include <QPushButton>
+#include <QSplitter>
 #include <QSpinBox>
 #include <QStringList>
 #include <QTabWidget>
@@ -73,6 +79,39 @@ QString controlTypeLabel(ControlType t)
     case ControlType::Finish:       return CoursePanelWidget::tr("Finish");
     case ControlType::CrossingPoint: return CoursePanelWidget::tr("Crossing");
     default:                        return CoursePanelWidget::tr("Control");
+    }
+}
+
+/** Code (or id if no code) and type, e.g. "31 (Control)". */
+QString controlLabel(const CourseControl& ctrl)
+{
+    const QString code = ctrl.description.code.isEmpty() ? ctrl.id : ctrl.description.code;
+    return code + QLatin1String(" (") + controlTypeLabel(ctrl.type) + QLatin1Char(')');
+}
+
+/**
+ * Keeps order (control ids) in sync with a tree's selection change,
+ * preserving the order in which the rows were selected.
+ */
+void updateSelectionOrder(const QTreeWidget* tree, const QItemSelection& selected,
+                          const QItemSelection& deselected, std::vector<QString>& order)
+{
+    for (const auto& index : deselected.indexes())
+    {
+        if (index.column() != 0) continue;
+        auto* item = tree->topLevelItem(index.row());
+        if (!item) continue;
+        const QString id = item->data(0, Qt::UserRole).toString();
+        order.erase(std::remove(order.begin(), order.end(), id), order.end());
+    }
+    for (const auto& index : selected.indexes())
+    {
+        if (index.column() != 0) continue;
+        auto* item = tree->topLevelItem(index.row());
+        if (!item) continue;
+        const QString id = item->data(0, Qt::UserRole).toString();
+        if (std::find(order.begin(), order.end(), id) == order.end())
+            order.push_back(id);
     }
 }
 
@@ -144,7 +183,8 @@ protected:
 
 
 CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay* overlay,
-                                     MainWindow* main_window, QWidget* parent)
+                                     MainWindow* main_window, const Actions& actions,
+                                     QWidget* parent)
 : QWidget(parent)
 , map(map)
 , db(db)
@@ -153,8 +193,23 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
 {
     tabs = new QTabWidget(this);
 
-    // ── Controls tab ──────────────────────────────────────────────
+    // ── Placing controls block ────────────────────────────────────
+    auto* placing_group = new QGroupBox(tr("Placing controls"));
     {
+        auto* place_control_btn = new QToolButton;
+        place_control_btn->setDefaultAction(actions.place_control);
+        place_control_btn->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        place_control_btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        // The native macOS style may not repaint a checkable tool button when
+        // its state changes, and its checked look is subtle anyway. Placing
+        // mode must be obvious, so it is drawn filled in the course color.
+        place_control_btn->setStyleSheet(QStringLiteral(
+            "QToolButton { padding: 4px; border: 1px solid palette(mid);"
+            " border-radius: 4px; background: palette(button); }"
+            "QToolButton:hover { border-color: rgb(148, 0, 211); }"
+            "QToolButton:checked { background: rgb(148, 0, 211); color: white;"
+            " border-color: rgb(148, 0, 211); font-weight: bold; }"));
+
         // Type selector: four exclusive toggle buttons for Start / Control / Finish / Crossing.
         // Clicking one sets the type that will be assigned to the next placed control.
         type_btn_start    = new QToolButton;
@@ -199,6 +254,14 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         type_row->addWidget(type_btn_finish);
         type_row->addWidget(type_btn_crossing);
 
+        auto* layout = new QVBoxLayout(placing_group);
+        layout->addWidget(place_control_btn);
+        layout->addLayout(type_row);
+        layout->setContentsMargins(4, 4, 4, 4);
+    }
+
+    // ── Controls tab ──────────────────────────────────────────────
+    {
         controls_tree = new ToggleSelectionTreeWidget;
         controls_tree->setColumnCount(2);
         controls_tree->setHeaderLabels({tr("Code"), tr("Type")});
@@ -236,7 +299,6 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         properties_widget = new ControlPropertiesWidget(map, db);
 
         auto* layout = new QVBoxLayout;
-        layout->addLayout(type_row);
         layout->addWidget(controls_tree, 1);
         layout->addWidget(selection_summary_label);
         layout->addLayout(add_to_course_row);
@@ -249,6 +311,26 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
 
     // ── Courses tab ───────────────────────────────────────────────
     {
+        // Color of all courses (e.g. a stronger one for pale printers)
+        course_color_btn = new QToolButton;
+        course_color_btn->setText(tr("Choose…"));
+        course_color_btn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        course_color_btn->setToolTip(
+            tr("Color of the controls, start, finish and legs of all courses "
+               "on the map, in print and in exported images"));
+        reset_course_color_btn = new QToolButton;
+        reset_course_color_btn->setText(tr("Default"));
+        reset_course_color_btn->setToolTip(tr("Return to the standard IOF purple"));
+
+        connect(course_color_btn,       &QToolButton::clicked, this, &CoursePanelWidget::chooseCourseColor);
+        connect(reset_course_color_btn, &QToolButton::clicked, this, &CoursePanelWidget::resetCourseColor);
+
+        auto* course_color_row = new QHBoxLayout;
+        course_color_row->addWidget(new QLabel(tr("Course color:")));
+        course_color_row->addWidget(course_color_btn);
+        course_color_row->addWidget(reset_course_color_btn);
+        course_color_row->addStretch();
+
         courses_list = new QListWidget;
         courses_list->setSelectionMode(QAbstractItemView::SingleSelection);
         connect(courses_list, &QListWidget::currentRowChanged,
@@ -287,28 +369,68 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         course_type_row->addWidget(new QLabel(tr("Type:")));
         course_type_row->addWidget(course_type_combo, 1);
 
-        // Entries sub-section
+        // Entries sub-section: all controls on the map (left) are picked
+        // and added to the entries of the selected course (right).
+        picker_tree = new ToggleSelectionTreeWidget;
+        picker_tree->setColumnCount(2);
+        picker_tree->setHeaderLabels({tr("Code"), tr("Type")});
+        picker_tree->setRootIsDecorated(false);
+        picker_tree->setSelectionBehavior(QAbstractItemView::SelectRows);
+        picker_tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
+        connect(picker_tree->selectionModel(), &QItemSelectionModel::selectionChanged,
+                this, &CoursePanelWidget::onPickerSelectionModelChanged);
+
+        add_entry_btn = new QPushButton(tr("Add selected"));
+        add_entry_btn->setToolTip(
+            tr("Add the controls selected in the list of controls on the map "
+               "to this course, in the order they were clicked"));
+        add_entry_btn->setEnabled(false);
+        connect(add_entry_btn, &QPushButton::clicked, this, &CoursePanelWidget::addPickedControlsToCourse);
+
+        auto* picker_pane = new QWidget;
+        {
+            auto* pane_layout = new QVBoxLayout(picker_pane);
+            pane_layout->addWidget(new QLabel(tr("Controls on map:")));
+            pane_layout->addWidget(picker_tree, 1);
+            pane_layout->addWidget(add_entry_btn);
+            pane_layout->setContentsMargins(0, 0, 0, 0);
+        }
+
         entries_list = new QListWidget;
         entries_list->setSelectionMode(QAbstractItemView::ExtendedSelection);
 
-        add_entry_btn    = new QPushButton(tr("Add selected"));
         remove_entry_btn = new QPushButton(tr("Remove"));
-        entry_up_btn     = new QPushButton(tr("Up"));
-        entry_down_btn   = new QPushButton(tr("Down"));
-        add_entry_btn->setToolTip(tr("Add the controls selected in the Controls tab to this course"));
         remove_entry_btn->setToolTip(tr("Remove the selected entries from this course"));
+        entry_up_btn   = new QToolButton;
+        entry_down_btn = new QToolButton;
+        entry_up_btn->setArrowType(Qt::UpArrow);
+        entry_down_btn->setArrowType(Qt::DownArrow);
+        entry_up_btn->setToolTip(tr("Up"));
+        entry_down_btn->setToolTip(tr("Down"));
 
-        connect(add_entry_btn,    &QPushButton::clicked, this, &CoursePanelWidget::addSelectedControlToCourse);
         connect(remove_entry_btn, &QPushButton::clicked, this, &CoursePanelWidget::removeEntryFromCourse);
-        connect(entry_up_btn,     &QPushButton::clicked, this, &CoursePanelWidget::moveEntryUp);
-        connect(entry_down_btn,   &QPushButton::clicked, this, &CoursePanelWidget::moveEntryDown);
+        connect(entry_up_btn,     &QToolButton::clicked, this, &CoursePanelWidget::moveEntryUp);
+        connect(entry_down_btn,   &QToolButton::clicked, this, &CoursePanelWidget::moveEntryDown);
 
         auto* entry_btns = new QHBoxLayout;
-        entry_btns->addWidget(add_entry_btn);
         entry_btns->addWidget(remove_entry_btn);
         entry_btns->addStretch();
         entry_btns->addWidget(entry_up_btn);
         entry_btns->addWidget(entry_down_btn);
+
+        auto* entries_pane = new QWidget;
+        {
+            auto* pane_layout = new QVBoxLayout(entries_pane);
+            pane_layout->addWidget(new QLabel(tr("Course controls:")));
+            pane_layout->addWidget(entries_list, 1);
+            pane_layout->addLayout(entry_btns);
+            pane_layout->setContentsMargins(0, 0, 0, 0);
+        }
+
+        auto* entries_splitter = new QSplitter(Qt::Horizontal);
+        entries_splitter->addWidget(picker_pane);
+        entries_splitter->addWidget(entries_pane);
+        entries_splitter->setChildrenCollapsible(false);
 
         // Points for the selected entry (Score courses only)
         entry_points_label   = new QLabel(tr("Points:"));
@@ -393,6 +515,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         default_points_row->addWidget(default_points_spinbox, 1);
 
         auto* layout = new QVBoxLayout;
+        layout->addLayout(course_color_row);
         layout->addWidget(new QLabel(tr("Courses:")));
         layout->addWidget(courses_list, 2);
         layout->addLayout(course_btns);
@@ -401,19 +524,8 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         layout->addLayout(legend_scale_row);
         layout->addLayout(legend_columns_row);
         layout->addLayout(default_points_row);
-        layout->addWidget(new QLabel(tr("Entries:")));
-        layout->addWidget(entries_list, 3);
-        layout->addLayout(entry_btns);
+        layout->addWidget(entries_splitter, 3);
         layout->addLayout(entry_points_row);
-
-        auto* export_competra_btn = new QPushButton(tr("Export course maps for Competra…"));
-        export_competra_btn->setToolTip(
-            tr("Save one map image per course and copy the corner coordinates "
-               "needed to attach the images to the distances in Competra."));
-        connect(export_competra_btn, &QPushButton::clicked,
-                this, &CoursePanelWidget::exportCompetraMapsRequested);
-        layout->addWidget(export_competra_btn);
-
         layout->setContentsMargins(4, 4, 4, 4);
         auto* tab = new QWidget;
         tab->setLayout(layout);
@@ -445,10 +557,25 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
     connect(clear_courses_btn, &QPushButton::clicked,
             this, &CoursePanelWidget::clearCoursesFromMap);
 
+    // Rarely needed tools, out of the way behind a "more" button
+    auto* more_menu = new QMenu(this);
+    more_menu->addAction(actions.symbol_reference);
+    auto* more_btn = new QToolButton;
+    more_btn->setText(QStringLiteral("⋯"));
+    more_btn->setToolTip(tr("More"));
+    more_btn->setAutoRaise(true);
+    // The menu is opened manually: with setMenu(), the button would also
+    // draw a menu arrow next to the dots.
+    connect(more_btn, &QToolButton::clicked, more_menu, [more_btn, more_menu]() {
+        more_menu->popup(more_btn->mapToGlobal(QPoint(0, more_btn->height())));
+    });
+
     auto* top_btns_row = new QHBoxLayout;
     top_btns_row->addWidget(import_courses_btn);
     top_btns_row->addWidget(recent_courses_btn);
     top_btns_row->addWidget(clear_courses_btn);
+    top_btns_row->addStretch();
+    top_btns_row->addWidget(more_btn);
 
     active_file_label = new QLabel;
     active_file_label->setWordWrap(true);
@@ -460,10 +587,34 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         active_file_label->setPalette(pal);
     }
 
+    auto* file_group = new QGroupBox(tr("Course file"));
+    {
+        auto* layout = new QVBoxLayout(file_group);
+        layout->addWidget(active_file_label);
+        layout->addLayout(top_btns_row);
+        layout->setContentsMargins(4, 4, 4, 4);
+    }
+
+    // ── Export block ──────────────────────────────────────────────
+    auto* export_group = new QGroupBox(tr("Export"));
+    {
+        auto* layout = new QHBoxLayout(export_group);
+        for (auto* action : {actions.export_iof, actions.export_competra_maps})
+        {
+            auto* btn = new QToolButton;
+            btn->setDefaultAction(action);
+            btn->setToolButtonStyle(Qt::ToolButtonTextOnly);
+            btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+            layout->addWidget(btn);
+        }
+        layout->setContentsMargins(4, 4, 4, 4);
+    }
+
     auto* main_layout = new QVBoxLayout(this);
-    main_layout->addLayout(top_btns_row);
-    main_layout->addWidget(active_file_label);
-    main_layout->addWidget(tabs);
+    main_layout->addWidget(file_group);
+    main_layout->addWidget(placing_group);
+    main_layout->addWidget(tabs, 1);
+    main_layout->addWidget(export_group);
     main_layout->setContentsMargins(4, 4, 4, 4);
     setLayout(main_layout);
 
@@ -481,11 +632,13 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
     connect(&db, &CourseDatabase::courseChanged,  this, &CoursePanelWidget::rebuildCoursesList);
     connect(&db, &CourseDatabase::courseRemoved,  this, &CoursePanelWidget::rebuildCoursesList);
     connect(&db, &CourseDatabase::activeFileChanged, this, &CoursePanelWidget::updateActiveFileLabel);
+    connect(&db, &CourseDatabase::courseColorChanged, this, &CoursePanelWidget::updateCourseColorButtons);
 
     // Initial population
     rebuildControlsTree();
     rebuildCoursesList();
     updateActiveFileLabel();
+    updateCourseColorButtons();
 }
 
 
@@ -612,6 +765,7 @@ void CoursePanelWidget::loadCourseFileOntoMap(const QString& absolute_path, cons
         controls_before.push_back(db.control(i));
     auto courses_before = coursesSnapshot();
     const QString event_name_before = db.eventName();
+    const QColor course_color_before = db.courseColor();
     std::vector<bool> legend_anchor_valid_before;
     std::vector<MapCoordF> legend_anchor_before;
     snapshotLegendAnchors(db, legend_anchor_valid_before, legend_anchor_before);
@@ -628,12 +782,14 @@ void CoursePanelWidget::loadCourseFileOntoMap(const QString& absolute_path, cons
     for (int i = 0; i < imported.numCourses(); ++i)
         db.addCourse(imported.course(i));
     db.setEventName(imported.eventName());
+    db.setCourseColor(imported.courseColor());
     copyLegendAnchors(imported, db);
     db.setActiveFile(relative_name);
 
     map.push(new ReplaceCourseDatabaseUndoStep(
         &map, std::move(controls_before), std::move(courses_before),
-        event_name_before, std::move(legend_anchor_valid_before), std::move(legend_anchor_before),
+        event_name_before, course_color_before,
+        std::move(legend_anchor_valid_before), std::move(legend_anchor_before),
         active_file_before));
 }
 
@@ -677,6 +833,7 @@ void CoursePanelWidget::clearCoursesFromMap()
         controls_before.push_back(db.control(i));
     auto courses_before = coursesSnapshot();
     const QString event_name_before = db.eventName();
+    const QColor course_color_before = db.courseColor();
     std::vector<bool> legend_anchor_valid_before;
     std::vector<MapCoordF> legend_anchor_before;
     snapshotLegendAnchors(db, legend_anchor_valid_before, legend_anchor_before);
@@ -687,6 +844,7 @@ void CoursePanelWidget::clearCoursesFromMap()
     while (db.numControls() > 0)
         db.removeControl(db.numControls() - 1);
     db.setEventName({});
+    db.setCourseColor(CourseDatabase::defaultCourseColor());
     db.clearLegendAnchors();
     // Detach only: the name stays in the recent-files history (already
     // added when it first became active), so a later new course won't
@@ -695,7 +853,8 @@ void CoursePanelWidget::clearCoursesFromMap()
 
     map.push(new ReplaceCourseDatabaseUndoStep(
         &map, std::move(controls_before), std::move(courses_before),
-        event_name_before, std::move(legend_anchor_valid_before), std::move(legend_anchor_before),
+        event_name_before, course_color_before,
+        std::move(legend_anchor_valid_before), std::move(legend_anchor_before),
         active_file_before));
 }
 
@@ -757,6 +916,39 @@ void CoursePanelWidget::rebuildControlsTree()
 
     rebuilding = false;
     updateSelectionSummary();
+    rebuildControlPicker();
+}
+
+
+void CoursePanelWidget::rebuildControlPicker()
+{
+    picked_control_order.clear();
+    picker_tree->clear();
+    for (int i = 0; i < db.numControls(); ++i)
+    {
+        const auto& ctrl = db.control(i);
+        auto* item = new QTreeWidgetItem;
+        item->setText(0, ctrl.description.code.isEmpty() ? ctrl.id : ctrl.description.code);
+        item->setText(1, controlTypeLabel(ctrl.type));
+        item->setData(0, Qt::UserRole, ctrl.id);
+        picker_tree->addTopLevelItem(item);
+    }
+    picker_tree->resizeColumnToContents(0);
+    updateAddEntryButton();
+}
+
+
+void CoursePanelWidget::onPickerSelectionModelChanged(const QItemSelection& selected,
+                                                       const QItemSelection& deselected)
+{
+    updateSelectionOrder(picker_tree, selected, deselected, picked_control_order);
+    updateAddEntryButton();
+}
+
+
+void CoursePanelWidget::updateAddEntryButton()
+{
+    add_entry_btn->setEnabled(selectedCourseIndex() >= 0 && !picked_control_order.empty());
 }
 
 void CoursePanelWidget::onControlItemClicked(QTreeWidgetItem* item, int /*column*/)
@@ -840,26 +1032,7 @@ void CoursePanelWidget::updateSelectionSummary()
 void CoursePanelWidget::onControlSelectionModelChanged(const QItemSelection& selected,
                                                         const QItemSelection& deselected)
 {
-    for (const auto& index : deselected.indexes())
-    {
-        if (index.column() != 0) continue;
-        auto* item = controls_tree->topLevelItem(index.row());
-        if (!item) continue;
-        const QString id = item->data(0, Qt::UserRole).toString();
-        selected_control_order.erase(
-            std::remove(selected_control_order.begin(), selected_control_order.end(), id),
-            selected_control_order.end());
-    }
-    for (const auto& index : selected.indexes())
-    {
-        if (index.column() != 0) continue;
-        auto* item = controls_tree->topLevelItem(index.row());
-        if (!item) continue;
-        const QString id = item->data(0, Qt::UserRole).toString();
-        if (std::find(selected_control_order.begin(), selected_control_order.end(), id)
-            == selected_control_order.end())
-            selected_control_order.push_back(id);
-    }
+    updateSelectionOrder(controls_tree, selected, deselected, selected_control_order);
     updateSelectionSummary();
 }
 
@@ -872,6 +1045,46 @@ void CoursePanelWidget::onCourseTargetComboChanged(int index)
 
 
 // ── Courses tab ───────────────────────────────────────────────────────────────
+
+void CoursePanelWidget::chooseCourseColor()
+{
+    const QColor color = QColorDialog::getColor(db.courseColor(), this, tr("Course color"));
+    if (color.isValid())
+        setCourseColor(color);
+}
+
+
+void CoursePanelWidget::resetCourseColor()
+{
+    setCourseColor(CourseDatabase::defaultCourseColor());
+}
+
+
+void CoursePanelWidget::setCourseColor(const QColor& color)
+{
+    if (color == db.courseColor())
+        return;
+    const QColor old_color = db.courseColor();
+    db.setCourseColor(color);
+    map.push(new ChangeCourseColorUndoStep(&map, old_color));
+}
+
+
+void CoursePanelWidget::updateCourseColorButtons()
+{
+    // A swatch of the current color, framed so that light colors stay visible.
+    const int size = course_color_btn->iconSize().height();
+    QPixmap swatch(size, size);
+    swatch.fill(db.courseColor());
+    {
+        QPainter painter(&swatch);
+        painter.setPen(palette().color(QPalette::Mid));
+        painter.drawRect(0, 0, size - 1, size - 1);
+    }
+    course_color_btn->setIcon(QIcon(swatch));
+    reset_course_color_btn->setEnabled(db.courseColor() != CourseDatabase::defaultCourseColor());
+}
+
 
 void CoursePanelWidget::rebuildCoursesList()
 {
@@ -919,13 +1132,7 @@ void CoursePanelWidget::rebuildEntriesList()
     for (const auto& entry : course.entries)
     {
         const auto* ctrl = db.findById(entry.control_id);
-        QString label = entry.control_id;
-        if (ctrl)
-        {
-            if (!ctrl->description.code.isEmpty())
-                label = ctrl->description.code;
-            label += QLatin1String(" (") + controlTypeLabel(ctrl->type) + QLatin1Char(')');
-        }
+        QString label = ctrl ? controlLabel(*ctrl) : entry.control_id;
         if (course.type == CourseType::Score)
             label += QLatin1String(" - ") + tr("%1 pts").arg(entry.points);
         auto* item = new QListWidgetItem(label);
@@ -971,6 +1178,8 @@ void CoursePanelWidget::onCourseSelectionChanged()
         legend_columns_spinbox->setValue(1);
     }
     rebuilding = false;
+
+    updateAddEntryButton();
 
     if (overlay)
         overlay->setVisibleCourse(idx >= 0 ? &db.course(idx) : nullptr);
@@ -1147,10 +1356,23 @@ void CoursePanelWidget::removeCourse()
 
 void CoursePanelWidget::addSelectedControlToCourse()
 {
+    addControlsToCourse(selectedControlIds());
+}
+
+
+void CoursePanelWidget::addPickedControlsToCourse()
+{
+    addControlsToCourse(picked_control_order);
+    // Start the next pick from scratch, and show where the controls went.
+    picker_tree->clearSelection();
+    entries_list->scrollToBottom();
+}
+
+
+void CoursePanelWidget::addControlsToCourse(const std::vector<QString>& control_ids)
+{
     const int idx = selectedCourseIndex();
     if (idx < 0) return;
-
-    const auto control_ids = selectedControlIds();
     if (control_ids.empty()) return;
 
     auto snapshot = coursesSnapshot();

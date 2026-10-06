@@ -43,6 +43,7 @@ private slots:
 
     void generateUniqueId();
     void databaseSignals();
+    void courseColorUndo();
 
     void sidecarFile();
     void courseFileDetachAndReattach();

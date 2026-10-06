@@ -311,6 +311,7 @@ ReplaceCourseDatabaseUndoStep::ReplaceCourseDatabaseUndoStep(
         std::vector<CourseControl> controls_snapshot,
         std::vector<Course> courses_snapshot,
         QString event_name_snapshot,
+        QColor course_color_snapshot,
         std::vector<bool> legend_anchor_valid_snapshot,
         std::vector<MapCoordF> legend_anchor_snapshot,
         QString active_file_snapshot)
@@ -318,6 +319,7 @@ ReplaceCourseDatabaseUndoStep::ReplaceCourseDatabaseUndoStep(
 , controls_snapshot(std::move(controls_snapshot))
 , courses_snapshot(std::move(courses_snapshot))
 , event_name_snapshot(std::move(event_name_snapshot))
+, course_color_snapshot(std::move(course_color_snapshot))
 , legend_anchor_valid_snapshot(std::move(legend_anchor_valid_snapshot))
 , legend_anchor_snapshot(std::move(legend_anchor_snapshot))
 , active_file_snapshot(std::move(active_file_snapshot))
@@ -351,7 +353,8 @@ UndoStep* ReplaceCourseDatabaseUndoStep::undo()
 
     auto* redo = new ReplaceCourseDatabaseUndoStep(
         map, std::move(current_controls), std::move(current_courses),
-        db.eventName(), std::move(current_legend_valid), std::move(current_legend_anchor),
+        db.eventName(), db.courseColor(),
+        std::move(current_legend_valid), std::move(current_legend_anchor),
         db.activeFile());
 
     // Clear the database and restore from snapshot
@@ -365,6 +368,7 @@ UndoStep* ReplaceCourseDatabaseUndoStep::undo()
     for (auto& c : courses_snapshot)
         db.addCourse(c);
     db.setEventName(event_name_snapshot);
+    db.setCourseColor(course_color_snapshot);
     db.clearLegendAnchors();
     for (std::size_t i = 0; i < legend_anchor_snapshot.size(); ++i)
     {
@@ -377,6 +381,29 @@ UndoStep* ReplaceCourseDatabaseUndoStep::undo()
 }
 
 void ReplaceCourseDatabaseUndoStep::saveImpl(QXmlStreamWriter& xml) const
+{
+    UndoStep::saveImpl(xml);
+}
+
+
+// ============================================================
+// ChangeCourseColorUndoStep
+// ============================================================
+
+ChangeCourseColorUndoStep::ChangeCourseColorUndoStep(Map* map, QColor old_color)
+: UndoStep(CourseColorChangedType, map)
+, old_color(std::move(old_color))
+{}
+
+UndoStep* ChangeCourseColorUndoStep::undo()
+{
+    CourseDatabase& db = map->courseDatabase();
+    auto* redo = new ChangeCourseColorUndoStep(map, db.courseColor());
+    db.setCourseColor(old_color);
+    return redo;
+}
+
+void ChangeCourseColorUndoStep::saveImpl(QXmlStreamWriter& xml) const
 {
     UndoStep::saveImpl(xml);
 }

@@ -19,6 +19,8 @@
 
 #include "course_t.h"
 
+#include <memory>
+
 #include <QtTest>
 #include <QBuffer>
 #include <QByteArray>
@@ -37,6 +39,7 @@
 #include "course/course_database.h"
 #include "course/course_serialization.h"
 #include "course/course_text_substitution.h"
+#include "course/course_undo.h"
 #include "fileformats/iof_course_export_full.h"
 #include "fileformats/xml_file_format_p.h"
 #include "gui/course/competra_export_dialog.h"
@@ -50,10 +53,11 @@ void CourseTest::roundtrip_data()
     QTest::addColumn<QString>("event_name");
     QTest::addColumn<int>("num_controls");
     QTest::addColumn<int>("num_courses");
+    QTest::addColumn<QColor>("course_color");  // invalid: keep the default
 
-    QTest::newRow("empty")    << QString()                    << 0 << 0;
-    QTest::newRow("one_ctrl") << QStringLiteral("Test")       << 1 << 0;
-    QTest::newRow("full")     << QStringLiteral("Sprint 2026") << 3 << 2;
+    QTest::newRow("empty")    << QString()                    << 0 << 0 << QColor();
+    QTest::newRow("one_ctrl") << QStringLiteral("Test")       << 1 << 0 << QColor();
+    QTest::newRow("full")     << QStringLiteral("Sprint 2026") << 3 << 2 << QColor(0, 70, 255);
 }
 
 void CourseTest::roundtrip()
@@ -61,11 +65,14 @@ void CourseTest::roundtrip()
     QFETCH(QString, event_name);
     QFETCH(int, num_controls);
     QFETCH(int, num_courses);
+    QFETCH(QColor, course_color);
 
     // ── Build a CourseDatabase ──────────────────────────────────────────────
 
     CourseDatabase original;
     original.setEventName(event_name);
+    if (course_color.isValid())
+        original.setCourseColor(course_color);
 
     if (num_controls >= 1)
     {
@@ -138,6 +145,7 @@ void CourseTest::roundtrip()
     // ── Deserialise ────────────────────────────────────────────────────────
 
     CourseDatabase loaded;
+    loaded.setCourseColor(Qt::green);  // must be replaced by the file's (or default) color
     {
         QXmlStreamReader reader(buffer);
         // advance to <courses> start element
@@ -151,6 +159,9 @@ void CourseTest::roundtrip()
     // ── Compare ────────────────────────────────────────────────────────────
 
     QCOMPARE(loaded.eventName(),   original.eventName());
+    QCOMPARE(loaded.courseColor(), original.courseColor());
+    // The default color is not written, so that files stay unchanged.
+    QCOMPARE(buffer.contains("color="), course_color.isValid());
     QCOMPARE(loaded.numControls(), original.numControls());
     QCOMPARE(loaded.numCourses(),  original.numCourses());
 
@@ -231,6 +242,24 @@ void CourseTest::databaseSignals()
     db.removeControl(idx);
     QCOMPARE(removed_idx, idx);
     QCOMPARE(db.numControls(), 0);
+}
+
+
+void CourseTest::courseColorUndo()
+{
+    Map map;
+    auto& db = map.courseDatabase();
+    QCOMPARE(db.courseColor(), CourseDatabase::defaultCourseColor());
+
+    const QColor blue(0, 70, 255);
+    db.setCourseColor(blue);
+    ChangeCourseColorUndoStep step(&map, CourseDatabase::defaultCourseColor());
+
+    std::unique_ptr<UndoStep> redo(step.undo());
+    QCOMPARE(db.courseColor(), CourseDatabase::defaultCourseColor());
+
+    std::unique_ptr<UndoStep> undo_again(redo->undo());
+    QCOMPARE(db.courseColor(), blue);
 }
 
 

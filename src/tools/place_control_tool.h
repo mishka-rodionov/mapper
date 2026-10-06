@@ -58,8 +58,11 @@ public:
                      CourseDatabase& db);
     ~PlaceControlTool() override;
 
-    /** Sets the type assigned to the NEXT newly placed control. */
-    void setNextControlType(ControlType type) { next_type = type; }
+    /**
+     * Sets the type assigned to the NEXT newly placed control.
+     * The preview under the cursor shows the symbol of this type.
+     */
+    void setNextControlType(ControlType type);
     ControlType nextControlType() const { return next_type; }
 
     /** Returns the id of the currently selected control, or empty string. */
@@ -97,9 +100,12 @@ private:
     void selectControl(const QString& id);
     void deleteSelectedControl();
 
+    /** True when a click at the cursor would place a new control. */
+    bool isPlacePreviewVisible() const;
+
     // Visual constants
     static constexpr int   hit_radius_px   = 10;   ///< Hit-test radius in pixels
-    static constexpr qreal preview_alpha   = 0.6;   ///< Opacity for the drag-preview circle
+    static constexpr qreal preview_alpha   = 0.6;   ///< Opacity for the cursor preview symbol
 
     CourseDatabase& db;
     ControlType     next_type = ControlType::Regular;

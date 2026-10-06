@@ -107,15 +107,12 @@ void CourseOverlay::setCustomSymbolPaths(const QJsonObject& d)
 
 namespace {
 
-// IOF course purple, per ISOM 2017-2 / ISSprOM 2019 specification.
-const QColor course_purple { 148, 0, 211 };
-
 // Standard IOF control sizes in millimeters at map scale.
 constexpr qreal circle_diameter_mm  = 6.25;  // 5.0mm standard, +25%
 constexpr qreal finish_outer_mm     = 7.0;
 constexpr qreal finish_inner_mm     = 5.0;
 constexpr qreal triangle_size_mm    = 6.0;
-constexpr qreal line_width_mm       = 0.35;
+constexpr qreal line_width_mm       = 0.385;  // 0.35mm standard, +10%
 constexpr qreal number_offset_mm    = 3.5;
 
 // Manual leg-break editing: gap length cut into the connector line at a break
@@ -285,6 +282,7 @@ CourseOverlay::CourseOverlay(MapWidget* widget, CourseDatabase& db, QObject* par
     connect(&db, &CourseDatabase::courseAdded,    this, &CourseOverlay::onDatabaseChanged);
     connect(&db, &CourseDatabase::courseChanged,  this, &CourseOverlay::onDatabaseChanged);
     connect(&db, &CourseDatabase::courseRemoved,  this, &CourseOverlay::onDatabaseChanged);
+    connect(&db, &CourseDatabase::courseColorChanged, this, &CourseOverlay::onDatabaseChanged);
 }
 
 CourseOverlay::~CourseOverlay()
@@ -495,7 +493,7 @@ void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to,
                              const std::vector<double>& breaks, const PaintContext& context) const
 {
     const qreal lw = mmToViewportPx(line_width_mm, context);
-    painter->setPen(QPen(course_purple, lw));
+    painter->setPen(QPen(db.courseColor(), lw));
     painter->setBrush(Qt::NoBrush);
 
     // Legs stop short of the symbols they join, leaving a small blank gap.
@@ -563,7 +561,7 @@ void CourseOverlay::paintLeg(QPainter* painter, QPointF from, QPointF to,
 
             painter->save();
             painter->setPen(Qt::NoPen);
-            painter->setBrush(course_purple);
+            painter->setBrush(db.courseColor());
             painter->drawEllipse(center, 2.0, 2.0);
             painter->restore();
         }
@@ -578,7 +576,7 @@ void CourseOverlay::paintStart(QPainter* painter, QPointF pos, double rotation_r
     const qreal lw   = mmToViewportPx(line_width_mm, context);
     const qreal side = mmToViewportPx(triangle_size_mm, context);
 
-    painter->setPen(QPen(course_purple, lw));
+    painter->setPen(QPen(db.courseColor(), lw));
     painter->setBrush(Qt::NoBrush);
 
     const qreal h = side * (std::sqrt(3.0) / 2.0);
@@ -602,7 +600,7 @@ void CourseOverlay::paintControl(QPainter* painter, QPointF pos, const CourseCon
     const qreal lw = mmToViewportPx(line_width_mm, context);
     const qreal r  = mmToViewportPx(circle_diameter_mm / 2.0, context);
 
-    painter->setPen(QPen(course_purple, lw));
+    painter->setPen(QPen(db.courseColor(), lw));
     painter->setBrush(Qt::NoBrush);
     paintControlCircle(painter, pos, r, ctrl, context);
 
@@ -665,7 +663,7 @@ void CourseOverlay::paintControlCircle(QPainter* painter, QPointF pos, qreal r, 
 
         painter->save();
         painter->setPen(Qt::NoPen);
-        painter->setBrush(course_purple);
+        painter->setBrush(db.courseColor());
         painter->drawEllipse(center, 2.0, 2.0);
         painter->restore();
     }
@@ -683,7 +681,7 @@ void CourseOverlay::paintFinish(QPainter* painter, QPointF pos, const PaintConte
     const qreal r_outer = mmToViewportPx(finish_outer_mm / 2.0, context);
     const qreal r_inner = mmToViewportPx(finish_inner_mm / 2.0, context);
 
-    painter->setPen(QPen(course_purple, lw));
+    painter->setPen(QPen(db.courseColor(), lw));
     painter->setBrush(Qt::NoBrush);
     painter->drawEllipse(pos, r_outer, r_outer);
     painter->drawEllipse(pos, r_inner, r_inner);
@@ -694,7 +692,7 @@ void CourseOverlay::paintCrossingPoint(QPainter* painter, QPointF pos, const Pai
     const qreal lw = mmToViewportPx(line_width_mm, context);
     const qreal r  = mmToViewportPx(2.5, context);
 
-    painter->setPen(QPen(course_purple, lw));
+    painter->setPen(QPen(db.courseColor(), lw));
     painter->setBrush(Qt::NoBrush);
     painter->drawLine(QPointF(pos.x() - r, pos.y() - r), QPointF(pos.x() + r, pos.y() + r));
     painter->drawLine(QPointF(pos.x() - r, pos.y() + r), QPointF(pos.x() + r, pos.y() - r));
@@ -724,7 +722,7 @@ void CourseOverlay::paintControlNumber(QPainter* painter, QPointF center, const 
     painter->setBrush(Qt::NoBrush);
     painter->drawPath(text_path);
     painter->setPen(Qt::NoPen);
-    painter->setBrush(course_purple);
+    painter->setBrush(db.courseColor());
     painter->drawPath(text_path);
     painter->restore();
 
@@ -1347,14 +1345,45 @@ qreal CourseOverlay::computeCourseDistanceM(const Course& course) const
             resolved.append(ctrl);
     }
 
-    if (resolved.size() < 2)
+    return pathDistanceM(resolved);
+}
+
+
+qreal CourseOverlay::computeFinishDistanceM(const Course& course) const
+{
+    QVector<const CourseControl*> resolved;
+    resolved.reserve(static_cast<int>(course.entries.size()));
+    for (const auto& entry : course.entries)
+    {
+        if (const auto* ctrl = db.findById(entry.control_id))
+            resolved.append(ctrl);
+    }
+
+    // Walk back from the (last) finish to the last real control, keeping
+    // any crossing points in between: the runner passes through them.
+    int finish = resolved.size() - 1;
+    while (finish >= 0 && resolved[finish]->type != ControlType::Finish)
+        --finish;
+    int from = finish - 1;
+    while (from >= 0 && resolved[from]->type == ControlType::CrossingPoint)
+        --from;
+    if (finish < 0 || from < 0)
+        return 0.0;
+
+    return pathDistanceM(resolved.mid(from, finish - from + 1));
+}
+
+
+qreal CourseOverlay::pathDistanceM(const QVector<const CourseControl*>& path) const
+{
+    if (path.size() < 2)
         return 0.0;
 
     qreal total_mm = 0.0;
-    for (int i = 1; i < resolved.size(); ++i)
+    for (int i = 1; i < path.size(); ++i)
     {
-        const MapCoordF p1(resolved[i-1]->position);
-        const MapCoordF p2(resolved[i  ]->position);
+        const MapCoordF p1(path[i-1]->position);
+        const MapCoordF p2(path[i  ]->position);
         const qreal dx = p1.x() - p2.x();
         const qreal dy = p1.y() - p2.y();
         total_mm += std::sqrt(dx * dx + dy * dy);
@@ -1389,20 +1418,48 @@ void CourseOverlay::paintStartCell(QPainter* painter, const QRectF& cell) const
 }
 
 
-void CourseOverlay::paintFinishCell(QPainter* painter, const QRectF& cell) const
+void CourseOverlay::paintFinishRow(QPainter* painter, const QRectF& row, qreal cell,
+                                   const QString& distance) const
 {
-    const qreal cx      = cell.center().x();
-    const qreal cy      = cell.center().y();
-    const qreal r_outer = std::min(cell.width(), cell.height()) * 0.38;
+    const qreal cy      = row.center().y();
+    const qreal r_outer = std::min(cell, row.height()) * 0.38;
     const qreal r_inner = r_outer * (finish_inner_mm / finish_outer_mm);
     const qreal lw      = std::max(1.0, r_outer * 0.15);
+
+    // Last control (circle) in the first column, finish in the last one.
+    const QPointF control_center(row.left() + cell / 2.0, cy);
+    const QPointF finish_center(row.right() - cell / 2.0, cy);
+    const qreal control_r = r_inner;
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setPen(QPen(Qt::black, lw));
     painter->setBrush(Qt::NoBrush);
-    painter->drawEllipse(QPointF(cx, cy), r_outer, r_outer);
-    painter->drawEllipse(QPointF(cx, cy), r_inner, r_inner);
+    painter->drawEllipse(control_center, control_r, control_r);
+    painter->drawEllipse(finish_center, r_outer, r_outer);
+    painter->drawEllipse(finish_center, r_inner, r_inner);
+
+    // The dashed line between them is interrupted by the distance text.
+    const qreal line_left  = control_center.x() + control_r + lw * 2.0;
+    const qreal line_right = finish_center.x() - r_outer - lw * 2.0;
+    qreal text_left  = (line_left + line_right) / 2.0;
+    qreal text_right = text_left;
+    if (!distance.isEmpty())
+    {
+        const qreal text_w = painter->fontMetrics().boundingRect(distance).width() + cell * 0.3;
+        text_left  = row.center().x() - text_w / 2.0;
+        text_right = row.center().x() + text_w / 2.0;
+        painter->drawText(QRectF(text_left, row.top(), text_right - text_left, row.height()),
+                          Qt::AlignCenter, distance);
+    }
+
+    QPen dash_pen(Qt::black, lw, Qt::CustomDashLine, Qt::FlatCap);
+    dash_pen.setDashPattern({ 4.0, 3.0 });
+    painter->setPen(dash_pen);
+    if (text_left > line_left)
+        painter->drawLine(QPointF(line_left, cy), QPointF(text_left, cy));
+    if (line_right > text_right)
+        painter->drawLine(QPointF(text_right, cy), QPointF(line_right, cy));
     painter->restore();
 }
 
@@ -1565,6 +1622,15 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
         }
     }
 
+    // Distance to the finish, rounded to 10 m as usual on description sheets.
+    QString finish_distance;
+    if (has_finish)
+    {
+        const qreal finish_m = computeFinishDistanceM(*visible_course);
+        if (finish_m > 0.5)
+            finish_distance = tr("%1 m").arg(std::max(10, qRound(finish_m / 10.0) * 10));
+    }
+
     // Each block is painted at its own, independently draggable anchor — blocks are
     // no longer forced into a single left-to-right flow.
     QVector<QRectF> block_rects(n_blocks);
@@ -1580,7 +1646,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
                                            /* show_header_text = */ i == 0,
                                            blk_has_start  ? start_ctrl  : nullptr,
                                            blk_has_finish ? finish_ctrl : nullptr,
-                                           context);
+                                           finish_distance, context);
     }
 
     if (context.interactive)
@@ -1606,7 +1672,7 @@ QRectF CourseOverlay::paintLegendBlock(QPainter* painter, QPointF top_left, int 
                                         const QString& header_name, const QString& header_info,
                                         bool show_header_text,
                                         const CourseControl* start_ctrl, const CourseControl* finish_ctrl,
-                                        const PaintContext& context) const
+                                        const QString& finish_distance, const PaintContext& context) const
 {
     constexpr int NCOLS = 8;
     const int total_w  = NCOLS * cell;
@@ -1669,10 +1735,12 @@ QRectF CourseOverlay::paintLegendBlock(QPainter* painter, QPointF top_left, int 
     // Column grid lines (only over the body, not the header). Bold after the 3rd
     // and 6th column — these separate the more significant control information
     // (object, marker placement), per the IOF description sheet standard.
+    // The finish row spans the full width, without columns.
+    const int columns_bottom = y0 + total_h - (finish_ctrl ? row_h : 0);
     for (int c = 1; c < NCOLS; ++c)
     {
         painter->setPen(QPen(Qt::black, (c % 3 == 0) ? bold_w : thin_w));
-        painter->drawLine(x0 + c * cell, y0 + header_h, x0 + c * cell, y0 + total_h);
+        painter->drawLine(x0 + c * cell, y0 + header_h, x0 + c * cell, columns_bottom);
     }
 
     int current_y = y0 + header_h;
@@ -1726,8 +1794,7 @@ QRectF CourseOverlay::paintLegendBlock(QPainter* painter, QPointF top_left, int 
         painter->setPen(QPen(Qt::black, bold_w));
         painter->drawLine(x0, current_y, x0 + total_w, current_y);
 
-        const QRectF finish_cell(x0, current_y, cell, row_h);
-        paintFinishCell(painter, finish_cell);
+        paintFinishRow(painter, QRectF(x0, current_y, total_w, row_h), cell, finish_distance);
         current_y += row_h;
     }
 

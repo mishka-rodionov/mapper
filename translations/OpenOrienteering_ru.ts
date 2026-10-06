@@ -5205,11 +5205,6 @@ selected</source>
         <source>Background drawing</source>
         <translation>Фоновый рисунок</translation>
     </message>
-    <message>
-        <location filename="../src/gui/map/map_editor.cpp" line="1289"/>
-        <source>&amp;Courses</source>
-        <translation>&amp;Дистанции</translation>
-    </message>
 </context>
 <context>
     <name>OpenOrienteering::MapEditorTool</name>
@@ -9707,9 +9702,9 @@ Location: %2</source>
         <translation>Удалить выбранную дистанцию</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_panel.cpp" line="174"/>
+        <location filename="../src/gui/course/course_panel.cpp" line="350"/>
         <source>Add selected</source>
-        <translation>Добавить выбранный</translation>
+        <translation>Добавить выбранные</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_panel.cpp" line="175"/>
@@ -9747,9 +9742,14 @@ Location: %2</source>
         <translation>Дистанции:</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_panel.cpp" line="213"/>
-        <source>Entries:</source>
-        <translation>Пункты:</translation>
+        <location filename="../src/gui/course/course_panel.cpp" line="391"/>
+        <source>Course controls:</source>
+        <translation>Пункты дистанции:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="360"/>
+        <source>Controls on map:</source>
+        <translation>КП на карте:</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_panel.cpp" line="220"/>
@@ -9850,9 +9850,9 @@ Score: controls may be taken in any order, each worth points.</source>
         <translation>Вниз</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_panel.cpp" line="273"/>
-        <source>Add the controls selected in the Controls tab to this course</source>
-        <translation>Добавить КП, выбранные во вкладке «КП», к этой дистанции</translation>
+        <location filename="../src/gui/course/course_panel.cpp" line="352"/>
+        <source>Add the controls selected in the list of controls on the map to this course, in the order they were clicked</source>
+        <translation>Добавить в эту дистанцию КП, выбранные в списке «КП на карте», в порядке выбора</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_panel.cpp" line="274"/>
@@ -10059,14 +10059,24 @@ Continue?</source>
         <translation>%1 б.</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_panel.cpp" line="409"/>
-        <source>Export course maps for Competra…</source>
-        <translation>Экспорт карт дистанций для Competra…</translation>
+        <location filename="../src/gui/course/course_panel.cpp" line="159"/>
+        <source>Placing controls</source>
+        <translation>Расстановка КП</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_panel.cpp" line="411"/>
-        <source>Save one map image per course and copy the corner coordinates needed to attach the images to the distances in Competra.</source>
-        <translation>Сохранить изображение карты для каждой дистанции и скопировать координаты углов, нужные для привязки изображений к дистанциям в Competra.</translation>
+        <location filename="../src/gui/course/course_panel.cpp" line="459"/>
+        <source>More</source>
+        <translation>Ещё</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="480"/>
+        <source>Course file</source>
+        <translation>Файл дистанций</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="489"/>
+        <source>Export</source>
+        <translation>Экспорт</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_panel.cpp" line="363"/>
@@ -10078,6 +10088,36 @@ Continue?</source>
         <source>Split the control description table into this many side-by-side blocks (useful for courses with many controls)</source>
         <translation>Разделить таблицу легенды КП на столько блоков, стоящих рядом (удобно для дистанций с большим количеством КП)</translation>
     </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="329"/>
+        <source>Course color:</source>
+        <translation>Цвет дистанций:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="316"/>
+        <source>Choose…</source>
+        <translation>Выбрать…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="319"/>
+        <source>Color of the controls, start, finish and legs of all courses on the map, in print and in exported images</source>
+        <translation>Цвет КП, старта, финиша и линий всех дистанций — на карте, при печати и в экспортированных изображениях</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="322"/>
+        <source>Default</source>
+        <translation>По умолчанию</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="323"/>
+        <source>Return to the standard IOF purple</source>
+        <translation>Вернуть стандартный фиолетовый цвет IOF</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp" line="1051"/>
+        <source>Course color</source>
+        <translation>Цвет дистанций</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::CourseFeature</name>
@@ -10087,14 +10127,24 @@ Continue?</source>
         <translation>Планирование &amp;дистанций</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_feature.cpp" line="61"/>
-        <source>Place &amp;Control</source>
-        <translation>Расставить &amp;КП</translation>
+        <location filename="../src/gui/course/course_feature.cpp" line="70"/>
+        <source>Place controls</source>
+        <translation>Расставить КП</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_feature.cpp" line="68"/>
-        <source>&amp;Export IOF (full course database)…</source>
-        <translation>&amp;Экспорт IOF (полная база дистанций)…</translation>
+        <location filename="../src/gui/course/course_feature.cpp" line="71"/>
+        <source>Click on the map to place a control of the type selected below</source>
+        <translation>Щёлкните по карте, чтобы поставить КП выбранного ниже типа</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="78"/>
+        <source>IOF XML…</source>
+        <translation>IOF XML…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="80"/>
+        <source>Export all controls and courses as IOF Data Standard 3.0 XML, for importing the courses into Competra.</source>
+        <translation>Экспорт всех КП и дистанций в формате IOF Data Standard 3.0 XML для импорта дистанций в Competra.</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_feature.cpp" line="133"/>
@@ -10135,9 +10185,14 @@ Continue?</source>
         <translation>Справочник символов &amp;ISCD…</translation>
     </message>
     <message>
-        <location filename="../src/gui/course/course_feature.cpp" line="82"/>
-        <source>Export course &amp;maps for Competra…</source>
-        <translation>Экспорт карт дистанций для &amp;Competra…</translation>
+        <location filename="../src/gui/course/course_feature.cpp" line="87"/>
+        <source>Maps for Competra…</source>
+        <translation>Карты для Competra…</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_feature.cpp" line="89"/>
+        <source>Save one map image per course and copy the corner coordinates needed to attach the images to the distances in Competra.</source>
+        <translation>Сохранить изображение карты для каждой дистанции и скопировать координаты углов, нужные для привязки изображений к дистанциям в Competra.</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_feature.cpp" line="225"/>

@@ -19,6 +19,7 @@
 
 #include "place_control_tool.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <Qt>
@@ -29,6 +30,7 @@
 #include <QPen>
 #include <QPoint>
 #include <QPointF>
+#include <QPolygonF>
 #include <QRectF>
 #include <QString>
 
@@ -37,6 +39,7 @@
 #include "core/map_view.h"
 #include "course/course_database.h"
 #include "course/course_undo.h"
+#include "gui/map/map_editor.h"
 #include "gui/map/map_widget.h"
 #include "gui/util_gui.h"
 #include "tools/tool_base.h"
@@ -47,9 +50,30 @@ namespace OpenOrienteering {
 
 namespace {
 
-const QColor course_purple { 148, 0, 211 };
-constexpr qreal circle_diameter_mm = 6.25;  // 5.0mm standard, +25%, must match course_overlay.cpp
-constexpr qreal line_width_mm      = 0.35;
+// Symbol dimensions, must match course_overlay.cpp
+constexpr qreal circle_diameter_mm = 6.25;  // 5.0mm standard, +25%
+constexpr qreal finish_outer_mm    = 7.0;
+constexpr qreal finish_inner_mm    = 5.0;
+constexpr qreal triangle_size_mm   = 6.0;
+constexpr qreal crossing_arm_mm    = 2.5;
+constexpr qreal line_width_mm      = 0.385;  // 0.35mm standard, +10%
+
+// Distance (mm) from the symbol's center to its outermost point, including half the stroke.
+qreal symbolOuterRadiusMm(ControlType type)
+{
+    switch (type)
+    {
+    case ControlType::Start:
+        return triangle_size_mm / std::sqrt(3.0) + line_width_mm / 2.0;  // circumradius
+    case ControlType::Finish:
+        return finish_outer_mm / 2.0 + line_width_mm / 2.0;
+    case ControlType::CrossingPoint:
+        return crossing_arm_mm * std::sqrt(2.0) + line_width_mm / 2.0;
+    case ControlType::Regular:
+        break;
+    }
+    return circle_diameter_mm / 2.0 + line_width_mm / 2.0;
+}
 
 }  // anonymous namespace
 
@@ -62,6 +86,14 @@ PlaceControlTool::PlaceControlTool(MapEditorController* editor,
 {}
 
 PlaceControlTool::~PlaceControlTool() = default;
+
+
+void PlaceControlTool::setNextControlType(ControlType type)
+{
+    next_type = type;
+    if (editor->getTool() == this)
+        updateDirtyRect();  // redraw the cursor preview with the new symbol
+}
 
 
 void PlaceControlTool::initImpl()
@@ -80,7 +112,7 @@ void PlaceControlTool::initImpl()
 
 void PlaceControlTool::mouseMove()
 {
-    // Repaint so the cursor-circle preview follows the mouse.
+    // Repaint so the cursor preview follows the mouse.
     updateDirtyRect();
 }
 
@@ -231,28 +263,79 @@ bool PlaceControlTool::keyPress(QKeyEvent* event)
 
 void PlaceControlTool::drawImpl(QPainter* painter, MapWidget* widget)
 {
+    if (!isPlacePreviewVisible())
+        return;
+
+    const auto* view = widget->getMapView();
+    const auto mm_to_px = [view](qreal mm) { return view->lengthToPixel(mm * 1000.0); };
+
+    QColor preview_color = db.courseColor();
+    preview_color.setAlphaF(preview_alpha);
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
-
-    const qreal lw = widget->getMapView()->lengthToPixel(line_width_mm * 1000.0);
-    const qreal r  = widget->getMapView()->lengthToPixel(circle_diameter_mm * 1000.0 / 2.0);
-
-    QColor preview_color = course_purple;
-    preview_color.setAlphaF(preview_alpha);
-    painter->setPen(QPen(preview_color, lw));
+    painter->setPen(QPen(preview_color, mm_to_px(line_width_mm)));
     painter->setBrush(Qt::NoBrush);
 
-    // Draw a preview circle at the current cursor position.
+    // Draw the symbol of the next control type at the current cursor position.
     const QPointF center = widget->mapToViewport(constrained_pos_map);
-    painter->drawEllipse(center, r, r);
+    switch (next_type)
+    {
+    case ControlType::Start:
+        {
+            const qreal r_outer = mm_to_px(triangle_size_mm) / std::sqrt(3.0);
+            QPolygonF triangle;
+            for (int k = 0; k < 3; ++k)
+            {
+                const qreal angle = -M_PI / 2.0 + k * (2.0 * M_PI / 3.0);
+                triangle << QPointF(center.x() + r_outer * std::cos(angle),
+                                    center.y() + r_outer * std::sin(angle));
+            }
+            painter->drawPolygon(triangle);
+        }
+        break;
+
+    case ControlType::Finish:
+        {
+            const qreal r_outer = mm_to_px(finish_outer_mm / 2.0);
+            const qreal r_inner = mm_to_px(finish_inner_mm / 2.0);
+            painter->drawEllipse(center, r_outer, r_outer);
+            painter->drawEllipse(center, r_inner, r_inner);
+        }
+        break;
+
+    case ControlType::CrossingPoint:
+        {
+            const qreal r = mm_to_px(crossing_arm_mm);
+            painter->drawLine(center + QPointF(-r, -r), center + QPointF(r, r));
+            painter->drawLine(center + QPointF(-r, r), center + QPointF(r, -r));
+        }
+        break;
+
+    case ControlType::Regular:
+        {
+            const qreal r = mm_to_px(circle_diameter_mm / 2.0);
+            painter->drawEllipse(center, r, r);
+        }
+        break;
+    }
 
     painter->restore();
+}
+
+bool PlaceControlTool::isPlacePreviewVisible() const
+{
+    // While dragging, or over an existing control, a click doesn't place a new one.
+    return !is_dragging && controlAtViewportPos(cur_pos, mapWidget()).isEmpty();
 }
 
 int PlaceControlTool::updateDirtyRectImpl(QRectF& rect)
 {
     // rect is in map coordinates (mm); return extra pixel border.
-    const qreal r = circle_diameter_mm / 2.0;
+    // Covers the largest symbol, so that switching the type leaves no traces.
+    qreal r = 0;
+    for (auto type : { ControlType::Start, ControlType::Regular,
+                       ControlType::Finish, ControlType::CrossingPoint })
+        r = std::max(r, symbolOuterRadiusMm(type));
     rect = QRectF(constrained_pos_map.x() - r,
                   constrained_pos_map.y() - r,
                   r * 2.0, r * 2.0);

@@ -1282,18 +1282,11 @@ void MapEditorController::createMenuAndToolbars()
 	map_menu->addMenu(mappart_merge_menu);
 	map_menu->addAction(mappart_merge_act);
 
-	// Courses submenu
+	// Course planning: everything else is done in the panel
 	if (course_feature)
 	{
 		map_menu->addSeparator();
-		QMenu* courses_menu = map_menu->addMenu(tr("&Courses"));
-		courses_menu->menuAction()->setMenuRole(QAction::NoRole);
-		courses_menu->addAction(course_feature->showPanelAction());
-		courses_menu->addAction(course_feature->placeControlAction());
-		courses_menu->addSeparator();
-		courses_menu->addAction(course_feature->exportIofFullAction());
-		courses_menu->addAction(course_feature->exportCompetraMapsAction());
-		courses_menu->addAction(course_feature->symbolBrowserAction());
+		map_menu->addAction(course_feature->showPanelAction());
 	}
 
 	// Symbols menu

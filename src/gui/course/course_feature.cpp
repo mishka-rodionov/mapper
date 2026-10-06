@@ -58,28 +58,37 @@ CourseFeature::CourseFeature(MapEditorController& controller)
     connect(&db, &CourseDatabase::courseAdded,  this, &CourseFeature::ensureActiveCourseFileName);
     connect(&db, &CourseDatabase::eventNameChanged, this, &CourseFeature::ensureActiveCourseFileName);
 
-    // "Course Planning" panel toggle action
+    // "Course Planning" panel toggle action: the only menu entry.
+    // All other actions are offered as buttons in the panel.
     show_panel_act = new QAction(tr("Course &Planning"), this);
     show_panel_act->setCheckable(true);
     show_panel_act->setMenuRole(QAction::NoRole);
     connect(show_panel_act, &QAction::toggled,
             this, &CourseFeature::showPanelToggled);
 
-    // "Place Control" tool action
-    place_control_act = new QAction(tr("Place &Control"), this);
+    // "Place Control" tool action: checking it starts placing controls,
+    // unchecking it stops placing and returns to the edit tool.
+    place_control_act = new QAction(tr("Place controls"), this);
+    place_control_act->setToolTip(tr("Click on the map to place a control of the type selected below"));
     place_control_act->setCheckable(true);
     place_control_act->setMenuRole(QAction::NoRole);
     connect(place_control_act, &QAction::triggered,
-            this, &CourseFeature::activatePlaceControlTool);
+            this, &CourseFeature::placeControlToggled);
 
     // "Export IOF (Full)" action
-    export_iof_act = new QAction(tr("&Export IOF (full course database)…"), this);
+    export_iof_act = new QAction(tr("IOF XML…"), this);
+    export_iof_act->setToolTip(
+        tr("Export all controls and courses as IOF Data Standard 3.0 XML, "
+           "for importing the courses into Competra."));
     export_iof_act->setMenuRole(QAction::NoRole);
     connect(export_iof_act, &QAction::triggered,
             this, &CourseFeature::exportIofFull);
 
     // "Export course maps for Competra" action
-    export_competra_maps_act = new QAction(tr("Export course &maps for Competra…"), this);
+    export_competra_maps_act = new QAction(tr("Maps for Competra…"), this);
+    export_competra_maps_act->setToolTip(
+        tr("Save one map image per course and copy the corner coordinates "
+           "needed to attach the images to the distances in Competra."));
     export_competra_maps_act->setMenuRole(QAction::NoRole);
     connect(export_competra_maps_act, &QAction::triggered,
             this, &CourseFeature::exportCompetraMaps);
@@ -119,10 +128,24 @@ void CourseFeature::showPanelToggled(bool show)
         dock_widget->setVisible(show);
 
     course_overlay->setPlanningActive(show);
+
+    // Controls are placed from the panel only, so closing it ends placing.
+    if (!show && current_tool && controller.getTool() == current_tool)
+        controller.setEditTool();
 }
 
-void CourseFeature::activatePlaceControlTool()
+void CourseFeature::placeControlToggled(bool checked)
 {
+    const bool tool_active = current_tool && controller.getTool() == current_tool;
+    if (!checked)
+    {
+        if (tool_active)
+            controller.setEditTool();
+        return;
+    }
+    if (tool_active)
+        return;
+
     auto* tool = new PlaceControlTool(&controller, place_control_act,
                                       controller.getMap()->courseDatabase());
     tool->setNextControlType(next_control_type);
@@ -259,7 +282,8 @@ void CourseFeature::createDockWidget()
         *controller.getMap(),
         controller.getMap()->courseDatabase(),
         course_overlay.get(),
-        controller.getWindow());
+        controller.getWindow(),
+        { place_control_act, export_iof_act, export_competra_maps_act, symbol_browser_act });
 
     connect(panel, &CoursePanelWidget::controlSelected,
             this, [this](const QString& id) {
@@ -267,8 +291,6 @@ void CourseFeature::createDockWidget()
             });
     connect(panel, &CoursePanelWidget::nextControlTypeChangeRequested,
             this, &CourseFeature::onNextControlTypeChangeRequested);
-    connect(panel, &CoursePanelWidget::exportCompetraMapsRequested,
-            export_competra_maps_act, &QAction::trigger);
 
     auto* main_window = controller.getWindow();
     dock_widget = new EditorDockWidget(tr("Course Planning"),
