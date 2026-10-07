@@ -32,6 +32,7 @@ namespace OpenOrienteering {
  *  - Database change signals
  *  - Course name placeholders in map texts
  *  - IOF export control ids
+ *  - IOF export of free order course rules
  */
 class CourseTest : public QObject
 {
@@ -53,6 +54,7 @@ private slots:
     void competraCornersInPng();
 
     void iofExportIds();
+    void iofExportFreeOrder();
 };
 
 

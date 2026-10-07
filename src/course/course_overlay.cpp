@@ -446,7 +446,7 @@ void CourseOverlay::paintCourse(QPainter* painter, const Course& course, const P
             break;
         default:
         {
-            const QString label = (course.type == CourseType::Score)
+            const QString label = isAnyOrder(course.type)
                 ? (ctrl->description.code.isEmpty() ? ctrl->id : ctrl->description.code)
                 : QString::number(seq);
             paintControl(painter, pos, *ctrl, label, context);
@@ -1496,6 +1496,7 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
             DescriptionRow r;
             r.seq      = seq++;
             r.points   = entry.points;
+            r.required = isAnyOrder(visible_course->type) && entry.required;
             r.code     = ctrl->description.code.isEmpty() ? ctrl->id : ctrl->description.code;
             r.part     = ctrl->description.feature_part;
             r.feature  = ctrl->description.feature;
@@ -1604,7 +1605,18 @@ void CourseOverlay::paintDescriptionTable(QPainter* painter, const PaintContext&
         const qreal dist_m = computeCourseDistanceM(*visible_course);
 
         if (total_rows > 0)
-            header_info += tr("%n control(s)", "", total_rows);
+        {
+            if (visible_course->type != CourseType::FreeOrder)
+                header_info += tr("%n control(s)", "", total_rows);
+            else if (visible_course->min_controls > 0)
+                header_info += tr("Take %1 of %n control(s)", "", total_rows)
+                               .arg(visible_course->min_controls);
+            else
+                header_info += tr("Take all %n control(s)", "", total_rows);
+
+            if (std::any_of(rows.begin(), rows.end(), [](const DescriptionRow& r) { return r.required; }))
+                header_info += QLatin1String(", ") + tr("* required");
+        }
 
         if (dist_m > 0.5)
         {
@@ -1774,8 +1786,18 @@ QRectF CourseOverlay::paintLegendBlock(QPainter* painter, QPointF top_left, int 
         painter->setPen(QPen(Qt::black, bold_sep ? bold_w : thin_w));
         painter->drawLine(x0, ry, x0 + total_w, ry);
 
+        // Column A: the sequence number, the points of a Score course, nothing for
+        // a FreeOrder course (there is no order); an asterisk marks a required control.
+        QString column_a;
+        if (course_type == CourseType::Score)
+            column_a = QString::number(r.points);
+        else if (course_type == CourseType::Linear)
+            column_a = QString::number(r.seq);
+        if (r.required)
+            column_a += QLatin1Char('*');
+
         const QString cells[NCOLS] = {
-            QString::number(course_type == CourseType::Score ? r.points : r.seq),
+            column_a,
             r.code, r.part, r.feature, r.approach, r.dims, r.location, r.other
         };
         for (int c = 0; c < NCOLS; ++c)

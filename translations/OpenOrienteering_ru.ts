@@ -9830,9 +9830,46 @@ Location: %2</source>
     <message>
         <location filename="../src/gui/course/course_panel.cpp" line="254"/>
         <source>Linear: controls must be visited in the listed order.
-Score: controls may be taken in any order, each worth points.</source>
+Score: controls may be taken in any order, each worth points.
+Free order: controls may be taken in any order, at least the minimum number of them must be taken.</source>
         <translation>Линейная: КП нужно проходить в указанном порядке.
-С баллами: КП можно брать в любом порядке, каждый КП даёт баллы.</translation>
+С баллами: КП можно брать в любом порядке, каждый КП даёт баллы.
+Свободный порядок: КП можно брать в любом порядке, взять нужно не меньше заданного минимума.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp"/>
+        <source>Free order (minimum controls)</source>
+        <translation>Свободный порядок (минимум КП)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp"/>
+        <source>Required</source>
+        <translation>Обязательный</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp"/>
+        <source>The control must be taken, otherwise the competitor is disqualified (Score and Free order courses only)</source>
+        <translation>КП нужно обязательно взять, иначе участник снимается (только для дистанций с баллами и в свободном порядке)</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp"/>
+        <source>Minimum controls:</source>
+        <translation>Минимум КП:</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp"/>
+        <source>All</source>
+        <translation>Все</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp"/>
+        <source>How many controls a competitor must take, in any order (Free order courses only). Required controls are counted in.</source>
+        <translation>Сколько КП участник должен взять в любом порядке (только для дистанций в свободном порядке). Обязательные КП входят в это число.</translation>
+    </message>
+    <message>
+        <location filename="../src/gui/course/course_panel.cpp"/>
+        <source>required</source>
+        <translation>обязательный</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_panel.cpp" line="262"/>
@@ -10896,6 +10933,29 @@ Continue?</source>
         <source>Climb %1 m</source>
         <translation>Набор высоты %1 м</translation>
     </message>
+    <message numerus="yes">
+        <location filename="../src/course/course_overlay.cpp"/>
+        <source>Take %1 of %n control(s)</source>
+        <translation>
+            <numerusform>Взять %1 из %n КП</numerusform>
+            <numerusform>Взять %1 из %n КП</numerusform>
+            <numerusform>Взять %1 из %n КП</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../src/course/course_overlay.cpp"/>
+        <source>Take all %n control(s)</source>
+        <translation>
+            <numerusform>Взять все КП (%n)</numerusform>
+            <numerusform>Взять все КП (%n)</numerusform>
+            <numerusform>Взять все КП (%n)</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../src/course/course_overlay.cpp"/>
+        <source>* required</source>
+        <translation>* обязательные</translation>
+    </message>
 </context>
 <context>
     <name>OpenOrienteering::ISCDSymbolBrowser</name>
@@ -10931,6 +10991,11 @@ Continue?</source>
         <location filename="../src/fileformats/iof_course_export_full.cpp" line="137"/>
         <source>Several controls have the same code: %1. Give each control its own code (column B) in the Course Planning panel.</source>
         <translation>У нескольких КП одинаковый код: %1. Задайте каждому КП свой код (столбец B) в панели планирования дистанций.</translation>
+    </message>
+    <message>
+        <location filename="../src/fileformats/iof_course_export_full.cpp"/>
+        <source>Course &quot;%1&quot; requires %2 controls to be taken, but it has only %3. Lower the minimum number of controls in the Course Planning panel.</source>
+        <translation>На дистанции «%1» нужно взять %2 КП, а всего на ней %3 КП. Уменьшите минимум КП в панели планирования дистанций.</translation>
     </message>
 </context>
 <context>

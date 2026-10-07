@@ -19,6 +19,7 @@
 
 #include "iof_course_export_full.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <Qt>
@@ -71,7 +72,7 @@ bool IofCourseExportFull::exportImplementation()
         return false;
     }
 
-    if (!assignExportIds(db))
+    if (!assignExportIds(db) || !checkMinControls(db))
         return false;
 
     QXmlStreamWriter writer(device());
@@ -138,6 +139,31 @@ bool IofCourseExportFull::assignExportIds(const CourseDatabase& db)
                       "Give each control its own code (column B) in the Course Planning panel.")
                    .arg(duplicates.join(QLatin1String(", "))));
         return false;
+    }
+    return true;
+}
+
+
+bool IofCourseExportFull::checkMinControls(const CourseDatabase& db)
+{
+    for (int i = 0; i < db.numCourses(); ++i)
+    {
+        const auto& course = db.course(i);
+        if (course.type != CourseType::FreeOrder || course.min_controls <= 0)
+            continue;
+
+        const int num_controls = static_cast<int>(std::count_if(
+            course.entries.begin(), course.entries.end(), [&db](const CourseEntry& entry) {
+                const auto* ctrl = db.findById(entry.control_id);
+                return ctrl && ctrl->type == ControlType::Regular;
+            }));
+        if (course.min_controls > num_controls)
+        {
+            addWarning(tr("Course \"%1\" requires %2 controls to be taken, but it has only %3. "
+                          "Lower the minimum number of controls in the Course Planning panel.")
+                       .arg(course.name).arg(course.min_controls).arg(num_controls));
+            return false;
+        }
     }
     return true;
 }
@@ -271,8 +297,22 @@ void IofCourseExportFull::writeCourse(const Course& course, const CourseDatabase
         XmlElementWriter cc(*xml, QLatin1String("CourseControl"));
         cc.writeAttribute(QLatin1String("type"), type_str);
         xml->writeTextElement(QLatin1String("Control"), ctrl ? exportId(*ctrl) : entry.control_id);
-        if (course.type == CourseType::Score && type_str == QLatin1String("Control"))
+        const bool is_control = type_str == QLatin1String("Control");
+        if (course.type == CourseType::Score && is_control)
             xml->writeTextElement(QLatin1String("Score"), QString::number(entry.points));
+        if (isAnyOrder(course.type) && is_control && entry.required)
+        {
+            XmlElementWriter extensions(*xml, QLatin1String("Extensions"));
+            xml->writeTextElement(QLatin1String("Required"), QStringLiteral("true"));
+        }
+    }
+
+    if (course.type == CourseType::FreeOrder)
+    {
+        XmlElementWriter extensions(*xml, QLatin1String("Extensions"));
+        XmlElementWriter free_order(*xml, QLatin1String("FreeOrder"));
+        if (course.min_controls > 0)
+            free_order.writeAttribute(QLatin1String("minControls"), course.min_controls);
     }
 }
 

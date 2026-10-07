@@ -122,9 +122,15 @@ void CourseTest::roundtrip()
     {
         Course c;
         c.name = QStringLiteral("Long");
-        c.type = CourseType::Linear;
+        c.type = CourseType::FreeOrder;
+        c.min_controls = 1;
         if (num_controls >= 3) c.entries.push_back(CourseEntry{QStringLiteral("S1")});
-        if (num_controls >= 2) c.entries.push_back(CourseEntry{QStringLiteral("101")});
+        if (num_controls >= 2)
+        {
+            CourseEntry entry{QStringLiteral("101")};
+            entry.required = true;
+            c.entries.push_back(entry);
+        }
         if (num_controls >= 3) c.entries.push_back(CourseEntry{QStringLiteral("F1")});
         original.addCourse(c);
     }
@@ -187,9 +193,13 @@ void CourseTest::roundtrip()
         const auto& l = loaded.course(i);
         QCOMPARE(l.name,              o.name);
         QCOMPARE(l.type,              o.type);
+        QCOMPARE(l.min_controls,      o.min_controls);
         QCOMPARE((int)l.entries.size(), (int)o.entries.size());
         for (std::size_t j = 0; j < o.entries.size(); ++j)
+        {
             QCOMPARE(l.entries[j].control_id, o.entries[j].control_id);
+            QCOMPARE(l.entries[j].required,   o.entries[j].required);
+        }
     }
 }
 
@@ -549,6 +559,108 @@ void CourseTest::iofExportIds()
         QVERIFY(!exporter.doExport());
         QVERIFY(!exporter.warnings().empty());
         QVERIFY(exporter.warnings().back().contains(QLatin1String("101")));
+    }
+}
+
+
+
+void CourseTest::iofExportFreeOrder()
+{
+    Map map;
+    auto& db = map.courseDatabase();
+    const auto add = [&db](const char* id, ControlType type) {
+        CourseControl ctrl;
+        ctrl.id = QString::fromLatin1(id);
+        ctrl.type = type;
+        ctrl.position = MapCoord::fromNative(1000 * db.numControls(), 0);
+        db.addControl(ctrl);
+    };
+    add("S1", ControlType::Start);
+    add("31", ControlType::Regular);
+    add("32", ControlType::Regular);
+    add("33", ControlType::Regular);
+    add("F1", ControlType::Finish);
+
+    Course course;
+    course.name = QStringLiteral("M21");
+    course.type = CourseType::FreeOrder;
+    course.min_controls = 2;
+    for (const char* id : { "S1", "31", "32", "33", "F1" })
+        course.entries.push_back({ QString::fromLatin1(id) });
+    course.entries[2].required = true;  // 32
+    db.addCourse(course);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const auto path = dir.filePath(QStringLiteral("free_order.xml"));
+
+    // Codes of the required controls, and the minControls attribute of
+    // <FreeOrder> ("all" if it is omitted, "none" if there is no <FreeOrder>).
+    struct Rules
+    {
+        QStringList required;
+        QString min_controls = QStringLiteral("none");
+    };
+    const auto read_rules = [](const QString& file_path) {
+        Rules rules;
+        QFile file(file_path);
+        if (!file.open(QIODevice::ReadOnly))
+            return rules;
+        QXmlStreamReader xml(&file);
+        QString control;
+        while (!xml.atEnd())
+        {
+            xml.readNext();
+            if (!xml.isStartElement())
+                continue;
+            // The control definitions have child elements; only the
+            // <CourseControl><Control> references are plain text.
+            if (xml.name() == QLatin1String("Control"))
+                control = xml.readElementText(QXmlStreamReader::SkipChildElements).trimmed();
+            else if (xml.name() == QLatin1String("Required") && xml.readElementText() == QLatin1String("true"))
+                rules.required.append(control);
+            else if (xml.name() == QLatin1String("FreeOrder"))
+                rules.min_controls = xml.attributes().hasAttribute(QLatin1String("minControls"))
+                                     ? xml.attributes().value(QLatin1String("minControls")).toString()
+                                     : QStringLiteral("all");
+        }
+        return rules;
+    };
+
+    {
+        IofCourseExportFull exporter(path, &map, nullptr);
+        QVERIFY(exporter.doExport());
+    }
+    auto rules = read_rules(path);
+    QCOMPARE(rules.required, QStringList{ QStringLiteral("32") });
+    QCOMPARE(rules.min_controls, QStringLiteral("2"));
+
+    // 0 means that all controls must be taken: the attribute is omitted.
+    db.course(0).min_controls = 0;
+    {
+        IofCourseExportFull exporter(path, &map, nullptr);
+        QVERIFY(exporter.doExport());
+    }
+    QCOMPARE(read_rules(path).min_controls, QStringLiteral("all"));
+
+    // A Score course keeps its required controls, but has no <FreeOrder>.
+    db.course(0).type = CourseType::Score;
+    {
+        IofCourseExportFull exporter(path, &map, nullptr);
+        QVERIFY(exporter.doExport());
+    }
+    rules = read_rules(path);
+    QCOMPARE(rules.required, QStringList{ QStringLiteral("32") });
+    QCOMPARE(rules.min_controls, QStringLiteral("none"));
+
+    // More controls to take than the course has.
+    db.course(0).type = CourseType::FreeOrder;
+    db.course(0).min_controls = 4;
+    {
+        IofCourseExportFull exporter(dir.filePath(QStringLiteral("too_many.xml")), &map, nullptr);
+        QVERIFY(!exporter.doExport());
+        QVERIFY(!exporter.warnings().empty());
+        QVERIFY(exporter.warnings().back().contains(QLatin1String("M21")));
     }
 }
 

@@ -30,6 +30,7 @@
 
 class QAction;
 class QButtonGroup;
+class QCheckBox;
 class QColor;
 class QComboBox;
 class QLabel;
@@ -128,6 +129,7 @@ private slots:
     void onCourseSelectionChanged();
     void onCourseTypeComboChanged(int index);
     void onDefaultPointsValueChanged(int value);
+    void onMinControlsValueChanged(int value);
 
     // Entries tab actions
     void addSelectedControlToCourse();
@@ -144,6 +146,7 @@ private slots:
     void moveEntryDown();
     void onEntriesSelectionChanged();
     void onEntryPointsValueChanged(int value);
+    void onEntryRequiredToggled(bool required);
 
 private:
     /** Captures a snapshot of all courses for an undo step. */
@@ -212,6 +215,7 @@ private:
     QToolButton*  entry_down_btn  = nullptr;
     QLabel*       entry_points_label   = nullptr;
     QSpinBox*     entry_points_spinbox = nullptr;
+    QCheckBox*    entry_required_checkbox = nullptr;  ///< Score and FreeOrder courses only
 
     QComboBox*    course_type_combo    = nullptr;
     QLabel*       climb_label     = nullptr;
@@ -222,6 +226,8 @@ private:
     QSpinBox*     legend_columns_spinbox = nullptr;
     QLabel*       default_points_label   = nullptr;
     QSpinBox*     default_points_spinbox = nullptr;
+    QLabel*       min_controls_label     = nullptr;
+    QSpinBox*     min_controls_spinbox   = nullptr;  ///< FreeOrder courses only
 
     std::vector<Course> legend_scale_drag_before;
     bool legend_scale_drag_active = false;

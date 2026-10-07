@@ -61,6 +61,8 @@ static const QLatin1String attr_points       ("points");
 static const QLatin1String attr_breaks       ("breaks");
 static const QLatin1String attr_circle_breaks("circle_breaks");
 static const QLatin1String attr_default_points("default_points");
+static const QLatin1String attr_min_controls ("min_controls");
+static const QLatin1String attr_required     ("required");
 static const QLatin1String attr_description_scale("description_scale");
 static const QLatin1String attr_description_columns("description_columns");
 // Legend block anchor attribute names: block 0 keeps the legacy "legend_x"/"legend_y"
@@ -112,12 +114,19 @@ ControlType controlTypeFromString(const QStringRef& s)
 
 QString courseTypeToString(CourseType t)
 {
-    return (t == CourseType::Score) ? QStringLiteral("score") : QStringLiteral("linear");
+    switch (t)
+    {
+    case CourseType::Score:     return QStringLiteral("score");
+    case CourseType::FreeOrder: return QStringLiteral("free_order");
+    default:                    return QStringLiteral("linear");
+    }
 }
 
 CourseType courseTypeFromString(const QStringRef& s)
 {
-    return (s == QLatin1String("score")) ? CourseType::Score : CourseType::Linear;
+    if (s == QLatin1String("score"))      return CourseType::Score;
+    if (s == QLatin1String("free_order")) return CourseType::FreeOrder;
+    return CourseType::Linear;
 }
 
 
@@ -176,12 +185,16 @@ void saveCourse(QXmlStreamWriter& xml, const Course& c)
         elem.writeAttribute(attr_description_columns, c.description_columns);
     if (c.type == CourseType::Score)
         elem.writeAttribute(attr_default_points, c.default_points);
+    if (c.type == CourseType::FreeOrder && c.min_controls > 0)
+        elem.writeAttribute(attr_min_controls, c.min_controls);
     for (const auto& entry : c.entries)
     {
         XmlElementWriter entry_elem(xml, tag_entry);
         entry_elem.writeAttribute(attr_control, entry.control_id);
         if (c.type == CourseType::Score)
             entry_elem.writeAttribute(attr_points, entry.points);
+        if (isAnyOrder(c.type) && entry.required)
+            entry_elem.writeAttribute(attr_required, QStringLiteral("true"));
         if (!entry.leg_breaks.empty())
         {
             QStringList parts;
@@ -262,6 +275,10 @@ Course loadCourse(QXmlStreamReader& xml)
     const int default_points = attrs.value(attr_default_points).toInt(&dp_ok);
     if (dp_ok && default_points > 0)
         c.default_points = default_points;
+    bool min_ok = false;
+    const int min_controls = attrs.value(attr_min_controls).toInt(&min_ok);
+    if (min_ok && min_controls > 0)
+        c.min_controls = min_controls;
 
     while (xml.readNextStartElement())
     {
@@ -270,6 +287,7 @@ Course loadCourse(QXmlStreamReader& xml)
             CourseEntry entry;
             entry.control_id = xml.attributes().value(attr_control).toString();
             entry.points     = xml.attributes().value(attr_points).toInt();
+            entry.required   = xml.attributes().value(attr_required) == QLatin1String("true");
             const QString breaks_str = xml.attributes().value(attr_breaks).toString();
             if (!breaks_str.isEmpty())
             {

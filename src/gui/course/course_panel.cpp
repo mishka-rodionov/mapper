@@ -25,6 +25,7 @@
 
 #include <QAction>
 #include <QButtonGroup>
+#include <QCheckBox>
 #include <QColorDialog>
 #include <QComboBox>
 #include <QFile>
@@ -353,13 +354,17 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         course_btns->addStretch();
         course_btns->addWidget(remove_course_btn);
 
-        // Course type: Linear (fixed order) vs Score (choice, points per control)
+        // Course type: Linear (fixed order), Score (choice, points per control)
+        // or FreeOrder (choice, a minimum number of controls)
         course_type_combo = new QComboBox;
         course_type_combo->addItem(tr("Linear (fixed order)"), static_cast<int>(CourseType::Linear));
         course_type_combo->addItem(tr("Score (choice)"), static_cast<int>(CourseType::Score));
+        course_type_combo->addItem(tr("Free order (minimum controls)"), static_cast<int>(CourseType::FreeOrder));
         course_type_combo->setToolTip(
             tr("Linear: controls must be visited in the listed order.\n"
-               "Score: controls may be taken in any order, each worth points."));
+               "Score: controls may be taken in any order, each worth points.\n"
+               "Free order: controls may be taken in any order, "
+               "at least the minimum number of them must be taken."));
         course_type_combo->setEnabled(false);
 
         connect(course_type_combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -441,14 +446,24 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         entry_points_spinbox->setEnabled(false);
         entry_points_label->setEnabled(false);
 
+        // Required flag for the selected entry (Score and FreeOrder courses only)
+        entry_required_checkbox = new QCheckBox(tr("Required"));
+        entry_required_checkbox->setToolTip(
+            tr("The control must be taken, otherwise the competitor is disqualified "
+               "(Score and Free order courses only)"));
+        entry_required_checkbox->setEnabled(false);
+
         connect(entries_list, &QListWidget::currentRowChanged,
                 this, &CoursePanelWidget::onEntriesSelectionChanged);
         connect(entry_points_spinbox, QOverload<int>::of(&QSpinBox::valueChanged),
                 this, &CoursePanelWidget::onEntryPointsValueChanged);
+        connect(entry_required_checkbox, &QCheckBox::toggled,
+                this, &CoursePanelWidget::onEntryRequiredToggled);
 
         auto* entry_points_row = new QHBoxLayout;
         entry_points_row->addWidget(entry_points_label);
         entry_points_row->addWidget(entry_points_spinbox, 1);
+        entry_points_row->addWidget(entry_required_checkbox);
 
         // Climb (manual entry)
         climb_label   = new QLabel(tr("Climb:"));
@@ -514,6 +529,24 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         default_points_row->addWidget(default_points_label);
         default_points_row->addWidget(default_points_spinbox, 1);
 
+        min_controls_label   = new QLabel(tr("Minimum controls:"));
+        min_controls_spinbox = new QSpinBox;
+        min_controls_spinbox->setRange(0, 999);
+        // 0 is the special value: all controls of the course must be taken.
+        min_controls_spinbox->setSpecialValueText(tr("All"));
+        min_controls_spinbox->setToolTip(
+            tr("How many controls a competitor must take, in any order "
+               "(Free order courses only). Required controls are counted in."));
+        min_controls_spinbox->setEnabled(false);
+        min_controls_label->setEnabled(false);
+
+        connect(min_controls_spinbox, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &CoursePanelWidget::onMinControlsValueChanged);
+
+        auto* min_controls_row = new QHBoxLayout;
+        min_controls_row->addWidget(min_controls_label);
+        min_controls_row->addWidget(min_controls_spinbox, 1);
+
         auto* layout = new QVBoxLayout;
         layout->addLayout(course_color_row);
         layout->addWidget(new QLabel(tr("Courses:")));
@@ -524,6 +557,7 @@ CoursePanelWidget::CoursePanelWidget(Map& map, CourseDatabase& db, CourseOverlay
         layout->addLayout(legend_scale_row);
         layout->addLayout(legend_columns_row);
         layout->addLayout(default_points_row);
+        layout->addLayout(min_controls_row);
         layout->addWidget(entries_splitter, 3);
         layout->addLayout(entry_points_row);
         layout->setContentsMargins(4, 4, 4, 4);
@@ -1135,6 +1169,8 @@ void CoursePanelWidget::rebuildEntriesList()
         QString label = ctrl ? controlLabel(*ctrl) : entry.control_id;
         if (course.type == CourseType::Score)
             label += QLatin1String(" - ") + tr("%1 pts").arg(entry.points);
+        if (isAnyOrder(course.type) && entry.required)
+            label += QLatin1String(" - ") + tr("required");
         auto* item = new QListWidgetItem(label);
         item->setData(Qt::UserRole, entry.control_id);
         entries_list->addItem(item);
@@ -1161,6 +1197,9 @@ void CoursePanelWidget::onCourseSelectionChanged()
     const bool is_score = idx >= 0 && db.course(idx).type == CourseType::Score;
     default_points_spinbox->setEnabled(is_score);
     default_points_label->setEnabled(is_score);
+    const bool is_free_order = idx >= 0 && db.course(idx).type == CourseType::FreeOrder;
+    min_controls_spinbox->setEnabled(is_free_order);
+    min_controls_label->setEnabled(is_free_order);
     if (idx >= 0)
     {
         const auto& c = db.course(idx);
@@ -1168,6 +1207,7 @@ void CoursePanelWidget::onCourseSelectionChanged()
         legend_scale_spinbox->setValue(descriptionScaleToPercent(c.description_scale));
         legend_columns_spinbox->setValue(c.description_columns);
         default_points_spinbox->setValue(c.default_points);
+        min_controls_spinbox->setValue(c.min_controls);
         const int type_index = course_type_combo->findData(static_cast<int>(c.type));
         if (type_index >= 0 && course_type_combo->currentIndex() != type_index)
             course_type_combo->setCurrentIndex(type_index);
@@ -1344,6 +1384,20 @@ void CoursePanelWidget::onDefaultPointsValueChanged(int value)
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
 }
 
+void CoursePanelWidget::onMinControlsValueChanged(int value)
+{
+    const int idx = selectedCourseIndex();
+    if (idx < 0 || rebuilding) return;
+
+    auto updated = db.course(idx);
+    if (updated.min_controls == value) return;
+
+    auto snapshot = coursesSnapshot();
+    updated.min_controls = value;
+    db.updateCourse(idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+}
+
 void CoursePanelWidget::removeCourse()
 {
     const int idx = selectedCourseIndex();
@@ -1393,14 +1447,19 @@ void CoursePanelWidget::onEntriesSelectionChanged()
 {
     const int course_idx = selectedCourseIndex();
     const int entry_idx  = entries_list->currentRow();
-    const bool show = course_idx >= 0 && entry_idx >= 0
-                    && db.course(course_idx).type == CourseType::Score;
+    const bool has_entry = course_idx >= 0 && entry_idx >= 0;
+    const auto type = has_entry ? db.course(course_idx).type : CourseType::Linear;
+    const bool show = has_entry && type == CourseType::Score;
+    const bool show_required = has_entry && isAnyOrder(type);
 
     rebuilding = true;
     entry_points_spinbox->setEnabled(show);
     entry_points_label->setEnabled(show);
     if (show)
         entry_points_spinbox->setValue(db.course(course_idx).entries[std::size_t(entry_idx)].points);
+    entry_required_checkbox->setEnabled(show_required);
+    entry_required_checkbox->setChecked(
+        show_required && db.course(course_idx).entries[std::size_t(entry_idx)].required);
     rebuilding = false;
 }
 
@@ -1419,6 +1478,27 @@ void CoursePanelWidget::onEntryPointsValueChanged(int value)
     updated.entries[std::size_t(entry_idx)].points = value;
     db.updateCourse(course_idx, std::move(updated));
     map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+    // The update rebuilds the entries list; keep the edited entry selected.
+    entries_list->setCurrentRow(entry_idx);
+}
+
+void CoursePanelWidget::onEntryRequiredToggled(bool required)
+{
+    if (rebuilding) return;
+    const int course_idx = selectedCourseIndex();
+    const int entry_idx  = entries_list->currentRow();
+    if (course_idx < 0 || entry_idx < 0) return;
+
+    auto updated = db.course(course_idx);
+    if (entry_idx >= static_cast<int>(updated.entries.size())) return;
+    if (updated.entries[std::size_t(entry_idx)].required == required) return;
+
+    auto snapshot = coursesSnapshot();
+    updated.entries[std::size_t(entry_idx)].required = required;
+    db.updateCourse(course_idx, std::move(updated));
+    map.push(new CoursesChangedUndoStep(&map, std::move(snapshot)));
+    // The update rebuilds the entries list; keep the edited entry selected.
+    entries_list->setCurrentRow(entry_idx);
 }
 
 void CoursePanelWidget::removeEntryFromCourse()

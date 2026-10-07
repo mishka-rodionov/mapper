@@ -30,9 +30,21 @@ namespace OpenOrienteering {
 /** Type (format) of a course. */
 enum class CourseType
 {
-    Linear,  ///< Controls visited in a fixed order
-    Score    ///< Controls scored independently, visited in any order
+    Linear,     ///< Controls visited in a fixed order
+    Score,      ///< Controls scored independently, visited in any order
+    FreeOrder   ///< Controls visited in any order; at least Course::min_controls must be taken
 };
+
+
+/**
+ * Returns true if the controls of a course of this type may be visited in any order:
+ * no legs are drawn, controls are labelled by their code instead of a sequence number,
+ * and controls can be marked as required (CourseEntry::required).
+ */
+inline bool isAnyOrder(CourseType type) noexcept
+{
+    return type != CourseType::Linear;
+}
 
 
 /**
@@ -42,6 +54,7 @@ struct CourseEntry
 {
     QString control_id;  ///< Matches CourseControl::id in the CourseDatabase
     int points = 0;      ///< Score awarded for this control (Score courses only)
+    bool required = false;  ///< The control must be taken (Score and FreeOrder courses only)
 
     /**
      * Manually placed gaps on the incoming leg line (the segment connecting
@@ -54,7 +67,7 @@ struct CourseEntry
     bool operator==(const CourseEntry& other) const noexcept
     {
         return control_id == other.control_id && points == other.points
-               && leg_breaks == other.leg_breaks;
+               && required == other.required && leg_breaks == other.leg_breaks;
     }
     bool operator!=(const CourseEntry& other) const noexcept { return !(*this == other); }
 };
@@ -74,6 +87,11 @@ struct Course
     double description_scale = 1.0;     ///< Scale factor for the on-map legend.
     int description_columns = 1;        ///< Number of side-by-side legend blocks (1-6).
     int default_points = 2;             ///< Default score for newly added entries (Score courses only)
+    /**
+     * Minimum number of regular controls to take (FreeOrder courses only).
+     * 0 means that all controls of the course must be taken.
+     */
+    int min_controls = 0;
 
     bool operator==(const Course& other) const noexcept;
     bool operator!=(const Course& other) const noexcept { return !(*this == other); }

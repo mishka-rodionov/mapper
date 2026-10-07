@@ -190,6 +190,7 @@ private:
     {
         int     seq;
         int     points;
+        bool    required = false;  ///< Marked with an asterisk in column A
         QString code;
         QString part;
         QString feature;
