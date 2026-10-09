@@ -10175,13 +10175,13 @@ Continue?</source>
     </message>
     <message>
         <location filename="../src/gui/course/course_feature.cpp" line="78"/>
-        <source>IOF XML…</source>
-        <translation>IOF XML…</translation>
+        <source>Courses for Competra…</source>
+        <translation>Дистанции для Competra…</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_feature.cpp" line="80"/>
-        <source>Export all controls and courses as IOF Data Standard 3.0 XML, for importing the courses into Competra.</source>
-        <translation>Экспорт всех КП и дистанций в формате IOF Data Standard 3.0 XML для импорта дистанций в Competra.</translation>
+        <source>Save all controls and courses to an IOF XML file (IOF Data Standard 3.0) for importing the courses into Competra.</source>
+        <translation>Сохранить все КП и дистанции в файл IOF XML (IOF Data Standard 3.0) для импорта дистанций в Competra.</translation>
     </message>
     <message>
         <location filename="../src/gui/course/course_feature.cpp" line="133"/>

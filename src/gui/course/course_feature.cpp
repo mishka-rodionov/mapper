@@ -75,11 +75,11 @@ CourseFeature::CourseFeature(MapEditorController& controller)
     connect(place_control_act, &QAction::triggered,
             this, &CourseFeature::placeControlToggled);
 
-    // "Export IOF (Full)" action
-    export_iof_act = new QAction(tr("IOF XML…"), this);
+    // "Export courses for Competra" action (IOF XML, all controls and courses)
+    export_iof_act = new QAction(tr("Courses for Competra…"), this);
     export_iof_act->setToolTip(
-        tr("Export all controls and courses as IOF Data Standard 3.0 XML, "
-           "for importing the courses into Competra."));
+        tr("Save all controls and courses to an IOF XML file "
+           "(IOF Data Standard 3.0) for importing the courses into Competra."));
     export_iof_act->setMenuRole(QAction::NoRole);
     connect(export_iof_act, &QAction::triggered,
             this, &CourseFeature::exportIofFull);

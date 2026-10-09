@@ -61,7 +61,7 @@ class MainWindow;
  *  - Placing controls: the Place Control tool and the type of the next control
  *  - Tabs: Controls (flat list of all controls) and Courses (list of courses
  *    + entry list for the selected course)
- *  - Export: IOF XML and course maps for Competra
+ *  - Export: courses (IOF XML) and course maps for Competra
  */
 class CoursePanelWidget : public QWidget
 {
