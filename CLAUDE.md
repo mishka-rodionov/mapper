@@ -92,19 +92,13 @@ Per the project memory: don't manually UI-test Mapper — just build with ninja 
 
 ## Межпроектные связи
 
-Этот проект — часть экосистемы из четырёх репозиториев:
-
-| Проект | Путь | Роль |
-|---|---|---|
-| **eSport** (backend) | `/Users/rodionov/backend_projects/eSport` | Ktor-сервер, парсит IOF XML, загруженный клиентами |
-| **competra-android** | `/Users/rodionov/android_projects/competra-android` | Android-клиент, загружает IOF XML на сервер |
-| **competra-web-ts** | `/Users/rodionov/web_projects/competra-web-ts` | Веб-клиент (React + TypeScript), загружает IOF XML на сервер. Заменил собой прежний Kotlin/Wasm веб-клиент (`competra-web`, теперь архивный) |
+Этот репозиторий — часть рабочего пространства `~/projects/competra/` вместе с бэкендом eSport (`../competra-server/eSport`, парсит IOF XML), Android-клиентом (`../competra-android`) и веб-клиентом (`../competra-web-ts`), которые загружают IOF XML на сервер. Состав экосистемы и общие правила — в `../CLAUDE.md`, он подгружается автоматически.
 
 ### Правила для Claude
 
 **При изменении формата IOF XML-экспорта** (файлы в `src/fileformats/iof_course_export*.cpp`, `kml_course_export.cpp`) — **спроси пользователя**: не сломает ли это парсер `IOFXmlParser.kt` в eSport? Именно этот файл разбирает экспортированные Mapper'ом курсы.
 
-**При изменении функционала, уже описанного в инструкции по работе в Mapper** — поправь соответствующий раздел инструкции в том же изменении, а не отдельным напоминанием пользователю. Инструкция лежит в веб-клиенте: `/Users/rodionov/web_projects/competra-web-ts/public/guides/mapper-course-planning-guide.html` (кнопка «Инструкция по работе в Mapper» в профиле, `MAPPER_GUIDE_URL` в `src/pages/ProfilePage.tsx`). Она описывает панель планирования дистанций (`src/gui/course/`), расстановку КП (`src/tools/place_control_tool.cpp`), оформление дистанции на карте (`src/course/course_overlay.cpp`), подстановку `{course}`, экспорт IOF XML и экспорт карт для Competra. Названия кнопок и меню в инструкции — русские, из `translations/OpenOrienteering_ru.ts`: при переименовании пункта интерфейса обнови и перевод, и инструкцию. Правка инструкции — это коммит в `competra-web-ts`.
+**При изменении функционала, уже описанного в инструкции по работе в Mapper** — поправь соответствующий раздел инструкции в том же изменении, а не отдельным напоминанием пользователю. Инструкция лежит в веб-клиенте: `../competra-web-ts/public/guides/mapper-course-planning-guide.html` (кнопка «Инструкция по работе в Mapper» в профиле, `MAPPER_GUIDE_URL` в `src/pages/ProfilePage.tsx`). Она описывает панель планирования дистанций (`src/gui/course/`), расстановку КП (`src/tools/place_control_tool.cpp`), оформление дистанции на карте (`src/course/course_overlay.cpp`), подстановку `{course}`, экспорт IOF XML и экспорт карт для Competra. Названия кнопок и меню в инструкции — русские, из `translations/OpenOrienteering_ru.ts`: при переименовании пункта интерфейса обнови и перевод, и инструкцию. Правка инструкции — это коммит в `competra-web-ts`.
 
 ### Цепочка использования
 1. Пользователь создаёт дистанции в Mapper и экспортирует их в IOF XML
