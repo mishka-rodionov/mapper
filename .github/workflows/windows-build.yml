@@ -117,3 +117,46 @@ jobs:
           name: Mapper-windows-x64
           path: Mapper-windows-x64.zip
           retention-days: 30
+
+      # Start Mapper from the unpacked ZIP the way it runs on a user's PC:
+      # only Windows' own directories in PATH, so a DLL missing from the
+      # package is not found in MSYS2 or among the runner's tools.
+      # Runs after the upload so that a failing package can be inspected.
+      - name: Smoke test (start with a clean PATH)
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'mapper-smoke'
+          Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
+          Expand-Archive -Path Mapper-windows-x64.zip -DestinationPath $dir
+          $exe = Join-Path $dir 'Mapper\Mapper.exe'
+
+          # Without this, Windows shows a message box for a DLL which is
+          # missing (0xc0000135) or fails to initialize (0xc0000142), and
+          # the process does not exit. The error mode is inherited.
+          Add-Type -Namespace Win32 -Name ErrorMode -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint mode);'
+          [Win32.ErrorMode]::SetErrorMode(0x0003) | Out-Null  # SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX
+
+          $psi = [System.Diagnostics.ProcessStartInfo]::new($exe)
+          $psi.UseShellExecute = $false
+          $psi.WorkingDirectory = Split-Path $exe
+          $psi.Environment['PATH'] = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          $p = [System.Diagnostics.Process]::Start($psi)
+
+          # Mapper has started when its main window is shown.
+          $deadline = (Get-Date).AddSeconds(60)
+          while ((Get-Date) -lt $deadline) {
+            if ($p.HasExited) {
+              Write-Host ('::error::Mapper.exe exited during startup with code 0x{0:X8}' -f $p.ExitCode)
+              exit 1
+            }
+            $p.Refresh()
+            if ($p.MainWindowHandle -ne [IntPtr]::Zero) {
+              Write-Host "Mapper.exe started: '$($p.MainWindowTitle)'"
+              $p.Kill()
+              exit 0
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          $p.Kill()
+          Write-Host '::error::Mapper.exe did not show a window within 60 seconds'
+          exit 1
