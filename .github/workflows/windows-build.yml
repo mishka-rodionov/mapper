@@ -8,7 +8,16 @@ on:
 
 jobs:
   windows:
+    # "nogdal" is a smaller package without GDAL and the ~150 DLLs it
+    # pulls in from MSYS2, for telling whether a startup failure on a
+    # user's PC comes from one of those libraries.
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [full, nogdal]
     runs-on: windows-latest
+    env:
+      PACKAGE: Mapper-windows-x64${{ matrix.variant == 'nogdal' && '-nogdal' || '' }}
     defaults:
       run:
         shell: msys2 {0}
@@ -30,7 +39,7 @@ jobs:
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-qt5
             mingw-w64-x86_64-proj
-            mingw-w64-x86_64-gdal
+            ${{ matrix.variant == 'full' && 'mingw-w64-x86_64-gdal' || '' }}
 
       - name: Configure
         run: |
@@ -40,7 +49,8 @@ jobs:
             -DMapper_PACKAGE_ASSISTANT=OFF \
             -DMapper_PACKAGE_QT=OFF \
             -DMapper_PACKAGE_PROJ=OFF \
-            -DMapper_PACKAGE_GDAL=OFF
+            -DMapper_PACKAGE_GDAL=OFF \
+            -DMapper_USE_GDAL=${{ matrix.variant == 'full' && 'ON' || 'OFF' }}
 
       - name: Build
         run: cmake --build build
@@ -101,21 +111,24 @@ jobs:
 
           # PROJ and GDAL data: Mapper looks for them in "proj" and "gdal"
           # next to the executable (data:/proj, data:/gdal).
-          mkdir -p "$DIST/proj" "$DIST/gdal"
+          mkdir -p "$DIST/proj"
           cp -r /mingw64/share/proj/. "$DIST/proj/"
-          cp -r /mingw64/share/gdal/. "$DIST/gdal/"
+          if [ "${{ matrix.variant }}" = full ]; then
+            mkdir -p "$DIST/gdal"
+            cp -r /mingw64/share/gdal/. "$DIST/gdal/"
+          fi
           test -f "$DIST/proj/proj.db"
           test -f "$DIST/Mapper.exe"
           test -f "$DIST/translations/OpenOrienteering_ru.qm"
           test -f "$DIST/translations/qt_ru.qm"
 
-          cd dist && zip -r "../Mapper-windows-x64.zip" Mapper
+          cd dist && zip -r "../${{ env.PACKAGE }}.zip" Mapper
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Mapper-windows-x64
-          path: Mapper-windows-x64.zip
+          name: ${{ env.PACKAGE }}
+          path: ${{ env.PACKAGE }}.zip
           retention-days: 30
 
       # Start Mapper from the unpacked ZIP the way it runs on a user's PC:
@@ -127,7 +140,7 @@ jobs:
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'mapper-smoke'
           Remove-Item -Recurse -Force $dir -ErrorAction SilentlyContinue
-          Expand-Archive -Path Mapper-windows-x64.zip -DestinationPath $dir
+          Expand-Archive -Path "$($env:PACKAGE).zip" -DestinationPath $dir
           $exe = Join-Path $dir 'Mapper\Mapper.exe'
 
           # Without this, Windows shows a message box for a DLL which is
